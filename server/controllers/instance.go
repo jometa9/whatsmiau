@@ -34,42 +34,55 @@ func NewInstances(repository interfaces.InstanceRepository, whatsmiau *whatsmiau
 func (s *Instance) Create(ctx echo.Context) error {
 	var request dto.CreateInstanceRequest
 	if err := ctx.Bind(&request); err != nil {
-		return utils.HTTPFail(ctx, http.StatusUnprocessableEntity, err, "failed to bind request body")
+		return ctx.JSON(http.StatusBadRequest, dto.CreateInstanceResponse{
+			Success: false,
+			Error:   "failed to bind request body",
+			Message: err.Error(),
+		})
 	}
 
 	if err := validator.New().Struct(&request); err != nil {
-		return utils.HTTPFail(ctx, http.StatusBadRequest, err, "invalid request body")
+		return ctx.JSON(http.StatusBadRequest, dto.CreateInstanceResponse{
+			Success: false,
+			Error:   "invalid request body",
+			Message: err.Error(),
+		})
 	}
 
-	request.ID = request.InstanceName
-	if request.Instance == nil {
-		request.Instance = &models.Instance{
-			ID: request.InstanceName,
-		}
-	} else {
-		request.Instance.ID = request.InstanceName
+	// Crear instancia con valores por defecto
+	instance := &models.Instance{
+		ID:        request.ID,
+		RemoteJID: "",
 	}
-	request.RemoteJID = ""
 
-	if len(request.ProxyHost) <= 0 && len(env.Env.ProxyAddresses) > 0 {
+	// Asignar proxy si está disponible en el env
+	if len(env.Env.ProxyAddresses) > 0 {
 		rd := rand.IntN(len(env.Env.ProxyAddresses))
 		proxyUrl := env.Env.ProxyAddresses[rd]
 
 		proxy, err := parseProxyURL(proxyUrl)
 		if err != nil {
-			return utils.HTTPFail(ctx, http.StatusUnprocessableEntity, err, "invalid proxy url on env")
+			return ctx.JSON(http.StatusBadRequest, dto.CreateInstanceResponse{
+				Success: false,
+				Error:   "invalid proxy url on env",
+				Message: err.Error(),
+			})
 		}
-		request.InstanceProxy = *proxy
+		instance.InstanceProxy = *proxy
 	}
 
 	c := ctx.Request().Context()
-	if err := s.repo.Create(c, request.Instance); err != nil {
+	if err := s.repo.Create(c, instance); err != nil {
 		zap.L().Error("failed to create instance", zap.Error(err))
-		return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to create instance")
+		return ctx.JSON(http.StatusInternalServerError, dto.CreateInstanceResponse{
+			Success: false,
+			Error:   "failed to create instance",
+			Message: err.Error(),
+		})
 	}
 
 	return ctx.JSON(http.StatusCreated, dto.CreateInstanceResponse{
-		Instance: request.Instance,
+		Success: true,
 	})
 }
 
@@ -127,11 +140,65 @@ func (s *Instance) Connect(ctx echo.Context) error {
 		return utils.HTTPFail(ctx, http.StatusNotFound, err, "instance not found")
 	}
 
+	// Verificar el estado actual de la instancia
+	status, err := s.whatsmiau.Status(request.ID)
+	if err != nil {
+		zap.L().Error("failed to get status instance", zap.Error(err))
+		return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to get status instance")
+	}
+
+	// Si ya está conectada, retornar que ya está conectada
+	if status == whatsmiau.Connected {
+		return ctx.JSON(http.StatusOK, dto.ConnectInstanceResponse{
+			Message:   "instance already connected",
+			Connected: true,
+		})
+	}
+
+	// Verificar si hay un QR code en cache
+	if qrCode, ok := s.whatsmiau.GetQRCode(request.ID); ok && qrCode != "" {
+		png, err := qrcode.Encode(qrCode, qrcode.Medium, 512)
+		if err != nil {
+			zap.L().Error("failed to encode qrcode", zap.Error(err))
+			return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to encode qrcode")
+		}
+		return ctx.JSON(http.StatusOK, dto.ConnectInstanceResponse{
+			Message:   "QR code available",
+			Connected: false,
+			Base64:    "data:image/png;base64," + base64.StdEncoding.EncodeToString(png),
+		})
+	}
+
+	// Si el observer está corriendo pero aún no hay QR, intentar conectar y esperar un poco
+	if s.whatsmiau.IsObserverRunning(request.ID) {
+		// El observer ya está corriendo, intentar obtener el QR
+		qrCode, err := s.whatsmiau.Connect(c, request.ID)
+		if err != nil {
+			zap.L().Error("failed to connect instance", zap.Error(err))
+			return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to connect instance")
+		}
+		if qrCode != "" {
+			png, err := qrcode.Encode(qrCode, qrcode.Medium, 512)
+			if err != nil {
+				zap.L().Error("failed to encode qrcode", zap.Error(err))
+				return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to encode qrcode")
+			}
+			return ctx.JSON(http.StatusOK, dto.ConnectInstanceResponse{
+				Message:   "QR code available",
+				Connected: false,
+				Base64:    "data:image/png;base64," + base64.StdEncoding.EncodeToString(png),
+			})
+		}
+	}
+
+	// Iniciar la conexión y obtener el QR
 	qrCode, err := s.whatsmiau.Connect(c, request.ID)
 	if err != nil {
 		zap.L().Error("failed to connect instance", zap.Error(err))
 		return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to connect instance")
 	}
+
+	// Si hay QR code, retornarlo en base64
 	if qrCode != "" {
 		png, err := qrcode.Encode(qrCode, qrcode.Medium, 512)
 		if err != nil {
@@ -139,12 +206,13 @@ func (s *Instance) Connect(ctx echo.Context) error {
 			return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to encode qrcode")
 		}
 		return ctx.JSON(http.StatusOK, dto.ConnectInstanceResponse{
-			Message:   "If instance restart this instance could be lost if you cannot connect",
+			Message:   "QR code available",
 			Connected: false,
 			Base64:    "data:image/png;base64," + base64.StdEncoding.EncodeToString(png),
 		})
 	}
 
+	// Si no hay QR code, significa que ya está conectada (el método Connect retorna "" cuando ya está conectada)
 	return ctx.JSON(http.StatusOK, dto.ConnectInstanceResponse{
 		Message:   "instance already connected",
 		Connected: true,
@@ -249,32 +317,50 @@ func (s *Instance) Delete(ctx echo.Context) error {
 	c := ctx.Request().Context()
 	var request dto.DeleteInstanceRequest
 	if err := ctx.Bind(&request); err != nil {
-		return utils.HTTPFail(ctx, http.StatusUnprocessableEntity, err, "failed to bind request body")
+		return ctx.JSON(http.StatusBadRequest, dto.DeleteInstanceResponse{
+			Success: false,
+			Error:   "failed to bind request body",
+			Message: err.Error(),
+		})
 	}
 
 	result, err := s.repo.List(c, request.ID)
 	if err != nil {
 		zap.L().Error("failed to list instances", zap.Error(err))
-		return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to list instances")
+		return ctx.JSON(http.StatusInternalServerError, dto.DeleteInstanceResponse{
+			Success: false,
+			Error:   "failed to list instances",
+			Message: err.Error(),
+		})
 	}
 
 	if len(result) == 0 {
 		return ctx.JSON(http.StatusOK, dto.DeleteInstanceResponse{
-			Message: "instance doesn't exists",
+			Success: false,
+			Error:   "instance doesn't exists",
+			Message: "instance not found",
 		})
 	}
 
 	if err := s.whatsmiau.Logout(ctx.Request().Context(), request.ID); err != nil {
 		zap.L().Error("failed to disconnect instance", zap.Error(err))
-		return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to logout instance")
+		return ctx.JSON(http.StatusInternalServerError, dto.DeleteInstanceResponse{
+			Success: false,
+			Error:   "failed to logout instance",
+			Message: err.Error(),
+		})
 	}
 
 	if err := s.repo.Delete(c, request.ID); err != nil {
 		zap.L().Error("failed to delete instance", zap.Error(err))
-		return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to delete instance")
+		return ctx.JSON(http.StatusInternalServerError, dto.DeleteInstanceResponse{
+			Success: false,
+			Error:   "failed to delete instance",
+			Message: err.Error(),
+		})
 	}
 
 	return ctx.JSON(http.StatusOK, dto.DeleteInstanceResponse{
-		Message: "instance deleted",
+		Success: true,
 	})
 }

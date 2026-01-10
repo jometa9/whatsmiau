@@ -3,13 +3,13 @@ package dto
 import "github.com/verbeux-ai/whatsmiau/models"
 
 type CreateInstanceRequest struct {
-	ID               string `json:"id,omitempty" validate:"required_without=InstanceName"`
-	InstanceName     string `json:"instanceName,omitempty" validate:"required_without=InstanceID"`
-	*models.Instance        // optional arguments
+	ID string `json:"id" validate:"required"`
 }
 
 type CreateInstanceResponse struct {
-	*models.Instance
+	Success bool   `json:"success"`
+	Error   string `json:"error,omitempty"`
+	Message string `json:"message,omitempty"`
 }
 
 type ListInstancesRequest struct {
@@ -55,6 +55,8 @@ type DeleteInstanceRequest struct {
 }
 
 type DeleteInstanceResponse struct {
+	Success bool   `json:"success"`
+	Error   string `json:"error,omitempty"`
 	Message string `json:"message,omitempty"`
 }
 

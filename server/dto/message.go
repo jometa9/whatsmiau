@@ -31,15 +31,9 @@ type MessageResponseKey struct {
 }
 
 type SendTextResponse struct {
-	Key              MessageResponseKey          `json:"key"`
-	PushName         string                      `json:"pushName"`
-	Status           string                      `json:"status"`
-	Message          SendTextResponseMessage     `json:"message"`
-	ContextInfo      SendTextResponseContextInfo `json:"contextInfo"`
-	MessageType      string                      `json:"messageType"`
-	MessageTimestamp int                         `json:"messageTimestamp"`
-	InstanceId       string                      `json:"instanceId"`
-	Source           string                      `json:"source"`
+	Success bool   `json:"success"`
+	Error   string `json:"error,omitempty"`
+	Message string `json:"message,omitempty"`
 }
 
 type SendTextResponseMessage struct {
@@ -86,15 +80,9 @@ type SendAudioResponseMessageAudio struct {
 }
 
 type SendAudioResponse struct {
-	ContextInfo      MessageContextInfo       `json:"contextInfo"`
-	InstanceId       string                   `json:"instanceId"`
-	Key              MessageResponseKey       `json:"key"`
-	Message          SendAudioResponseMessage `json:"message"`
-	MessageTimestamp int                      `json:"messageTimestamp"`
-	MessageType      string                   `json:"messageType"`
-	PushName         string                   `json:"pushName"`
-	Source           string                   `json:"source"`
-	Status           string                   `json:"status"`
+	Success bool   `json:"success"`
+	Error   string `json:"error,omitempty"`
+	Message string `json:"message,omitempty"`
 }
 type MessageContextInfo struct {
 	MessageSecret             string              `json:"messageSecret"`
@@ -141,15 +129,9 @@ type SendDocumentRequest struct {
 }
 
 type SendDocumentResponse struct {
-	Key              MessageResponseKey       `json:"key,omitempty"`
-	PushName         string                   `json:"pushName,omitempty"`
-	Status           string                   `json:"status,omitempty"`
-	Message          SendDocumentResponseData `json:"message,omitempty"`
-	ContextInfo      any                      `json:"contextInfo,omitempty"`
-	MessageType      string                   `json:"messageType,omitempty"`
-	MessageTimestamp int                      `json:"messageTimestamp,omitempty"`
-	InstanceId       string                   `json:"instanceId,omitempty"`
-	Source           string                   `json:"source,omitempty"`
+	Success bool   `json:"success"`
+	Error   string `json:"error,omitempty"`
+	Message string `json:"message,omitempty"`
 }
 
 type SendDocumentResponseData struct {

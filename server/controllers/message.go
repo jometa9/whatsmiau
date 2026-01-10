@@ -9,7 +9,6 @@ import (
 	"github.com/verbeux-ai/whatsmiau/interfaces"
 	"github.com/verbeux-ai/whatsmiau/lib/whatsmiau"
 	"github.com/verbeux-ai/whatsmiau/server/dto"
-	"github.com/verbeux-ai/whatsmiau/utils"
 	"go.mau.fi/whatsmeow/types"
 	"go.uber.org/zap"
 )
@@ -29,17 +28,29 @@ func NewMessages(repository interfaces.InstanceRepository, whatsmiau *whatsmiau.
 func (s *Message) SendText(ctx echo.Context) error {
 	var request dto.SendTextRequest
 	if err := ctx.Bind(&request); err != nil {
-		return utils.HTTPFail(ctx, http.StatusUnprocessableEntity, err, "failed to bind request body")
+		return ctx.JSON(http.StatusBadRequest, dto.SendTextResponse{
+			Success: false,
+			Error:   "failed to bind request body",
+			Message: err.Error(),
+		})
 	}
 
 	if err := validator.New().Struct(&request); err != nil {
-		return utils.HTTPFail(ctx, http.StatusBadRequest, err, "invalid request body")
+		return ctx.JSON(http.StatusBadRequest, dto.SendTextResponse{
+			Success: false,
+			Error:   "invalid request body",
+			Message: err.Error(),
+		})
 	}
 
 	jid, err := numberToJid(request.Number)
 	if err != nil {
 		zap.L().Error("error converting number to jid", zap.Error(err))
-		return utils.HTTPFail(ctx, http.StatusBadRequest, err, "invalid number format")
+		return ctx.JSON(http.StatusBadRequest, dto.SendTextResponse{
+			Success: false,
+			Error:   "invalid number format",
+			Message: err.Error(),
+		})
 	}
 
 	sendText := &whatsmiau.SendText{
@@ -64,42 +75,47 @@ func (s *Message) SendText(ctx echo.Context) error {
 		time.Sleep(time.Millisecond * time.Duration(request.Delay)) // TODO: create a more robust solution
 	}
 
-	res, err := s.whatsmiau.SendText(c, sendText)
+	_, err = s.whatsmiau.SendText(c, sendText)
 	if err != nil {
 		zap.L().Error("Whatsmiau.SendText failed", zap.Error(err))
-		return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to send text")
+		return ctx.JSON(http.StatusInternalServerError, dto.SendTextResponse{
+			Success: false,
+			Error:   "failed to send text",
+			Message: err.Error(),
+		})
 	}
 
 	return ctx.JSON(http.StatusOK, dto.SendTextResponse{
-		Key: dto.MessageResponseKey{
-			RemoteJid: request.Number,
-			FromMe:    true,
-			Id:        res.ID,
-		},
-		Status: "sent",
-		Message: dto.SendTextResponseMessage{
-			Conversation: request.Text,
-		},
-		MessageType:      "conversation",
-		MessageTimestamp: int(res.CreatedAt.Unix() / 1000),
-		InstanceId:       request.InstanceID,
+		Success: true,
 	})
 }
 
 func (s *Message) SendAudio(ctx echo.Context) error {
 	var request dto.SendAudioRequest
 	if err := ctx.Bind(&request); err != nil {
-		return utils.HTTPFail(ctx, http.StatusUnprocessableEntity, err, "failed to bind request body")
+		return ctx.JSON(http.StatusBadRequest, dto.SendAudioResponse{
+			Success: false,
+			Error:   "failed to bind request body",
+			Message: err.Error(),
+		})
 	}
 
 	if err := validator.New().Struct(&request); err != nil {
-		return utils.HTTPFail(ctx, http.StatusBadRequest, err, "invalid request body")
+		return ctx.JSON(http.StatusBadRequest, dto.SendAudioResponse{
+			Success: false,
+			Error:   "invalid request body",
+			Message: err.Error(),
+		})
 	}
 
 	jid, err := numberToJid(request.Number)
 	if err != nil {
 		zap.L().Error("error converting number to jid", zap.Error(err))
-		return utils.HTTPFail(ctx, http.StatusBadRequest, err, "invalid number format")
+		return ctx.JSON(http.StatusBadRequest, dto.SendAudioResponse{
+			Success: false,
+			Error:   "invalid number format",
+			Message: err.Error(),
+		})
 	}
 
 	sendText := &whatsmiau.SendAudioRequest{
@@ -125,23 +141,18 @@ func (s *Message) SendAudio(ctx echo.Context) error {
 		time.Sleep(time.Millisecond * time.Duration(request.Delay)) // TODO: create a more robust solution
 	}
 
-	res, err := s.whatsmiau.SendAudio(c, sendText)
+	_, err = s.whatsmiau.SendAudio(c, sendText)
 	if err != nil {
 		zap.L().Error("Whatsmiau.SendAudioRequest failed", zap.Error(err))
-		return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to send audio")
+		return ctx.JSON(http.StatusInternalServerError, dto.SendAudioResponse{
+			Success: false,
+			Error:   "failed to send audio",
+			Message: err.Error(),
+		})
 	}
 
 	return ctx.JSON(http.StatusOK, dto.SendAudioResponse{
-		Key: dto.MessageResponseKey{
-			RemoteJid: request.Number,
-			FromMe:    true,
-			Id:        res.ID,
-		},
-
-		Status:           "sent",
-		MessageType:      "audioMessage",
-		MessageTimestamp: int(res.CreatedAt.Unix() / 1000),
-		InstanceId:       request.InstanceID,
+		Success: true,
 	})
 }
 
@@ -149,11 +160,19 @@ func (s *Message) SendAudio(ctx echo.Context) error {
 func (s *Message) SendMedia(ctx echo.Context) error {
 	var request dto.SendMediaRequest
 	if err := ctx.Bind(&request); err != nil {
-		return utils.HTTPFail(ctx, http.StatusUnprocessableEntity, err, "failed to bind request body")
+		return ctx.JSON(http.StatusBadRequest, dto.SendDocumentResponse{
+			Success: false,
+			Error:   "failed to bind request body",
+			Message: err.Error(),
+		})
 	}
 
 	if err := validator.New().Struct(&request); err != nil {
-		return utils.HTTPFail(ctx, http.StatusBadRequest, err, "invalid request body")
+		return ctx.JSON(http.StatusBadRequest, dto.SendDocumentResponse{
+			Success: false,
+			Error:   "invalid request body",
+			Message: err.Error(),
+		})
 	}
 	switch request.Mediatype {
 	case "image":
@@ -167,11 +186,19 @@ func (s *Message) SendMedia(ctx echo.Context) error {
 func (s *Message) SendDocument(ctx echo.Context) error {
 	var request dto.SendDocumentRequest
 	if err := ctx.Bind(&request); err != nil {
-		return utils.HTTPFail(ctx, http.StatusUnprocessableEntity, err, "failed to bind request body")
+		return ctx.JSON(http.StatusBadRequest, dto.SendDocumentResponse{
+			Success: false,
+			Error:   "failed to bind request body",
+			Message: err.Error(),
+		})
 	}
 
 	if err := validator.New().Struct(&request); err != nil {
-		return utils.HTTPFail(ctx, http.StatusBadRequest, err, "invalid request body")
+		return ctx.JSON(http.StatusBadRequest, dto.SendDocumentResponse{
+			Success: false,
+			Error:   "invalid request body",
+			Message: err.Error(),
+		})
 	}
 
 	return s.sendDocument(ctx, request)
@@ -181,7 +208,11 @@ func (s *Message) sendDocument(ctx echo.Context, request dto.SendDocumentRequest
 	jid, err := numberToJid(request.Number)
 	if err != nil {
 		zap.L().Error("error converting number to jid", zap.Error(err))
-		return utils.HTTPFail(ctx, http.StatusBadRequest, err, "invalid number format")
+		return ctx.JSON(http.StatusBadRequest, dto.SendDocumentResponse{
+			Success: false,
+			Error:   "invalid number format",
+			Message: err.Error(),
+		})
 	}
 
 	sendData := &whatsmiau.SendDocumentRequest{
@@ -196,33 +227,37 @@ func (s *Message) sendDocument(ctx echo.Context, request dto.SendDocumentRequest
 	c := ctx.Request().Context()
 	time.Sleep(time.Millisecond * time.Duration(request.Delay)) // TODO: create a more robust solution
 
-	res, err := s.whatsmiau.SendDocument(c, sendData)
+	_, err = s.whatsmiau.SendDocument(c, sendData)
 	if err != nil {
 		zap.L().Error("Whatsmiau.SendDocument failed", zap.Error(err))
-		return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to send document")
+		return ctx.JSON(http.StatusInternalServerError, dto.SendDocumentResponse{
+			Success: false,
+			Error:   "failed to send document",
+			Message: err.Error(),
+		})
 	}
 
 	return ctx.JSON(http.StatusOK, dto.SendDocumentResponse{
-		Key: dto.MessageResponseKey{
-			RemoteJid: request.Number,
-			FromMe:    true,
-			Id:        res.ID,
-		},
-		Status:           "sent",
-		MessageType:      "documentMessage",
-		MessageTimestamp: int(res.CreatedAt.Unix() / 1000),
-		InstanceId:       request.InstanceID,
+		Success: true,
 	})
 }
 
 func (s *Message) SendImage(ctx echo.Context) error {
 	var request dto.SendDocumentRequest
 	if err := ctx.Bind(&request); err != nil {
-		return utils.HTTPFail(ctx, http.StatusUnprocessableEntity, err, "failed to bind request body")
+		return ctx.JSON(http.StatusBadRequest, dto.SendDocumentResponse{
+			Success: false,
+			Error:   "failed to bind request body",
+			Message: err.Error(),
+		})
 	}
 
 	if err := validator.New().Struct(&request); err != nil {
-		return utils.HTTPFail(ctx, http.StatusBadRequest, err, "invalid request body")
+		return ctx.JSON(http.StatusBadRequest, dto.SendDocumentResponse{
+			Success: false,
+			Error:   "invalid request body",
+			Message: err.Error(),
+		})
 	}
 
 	return s.sendImage(ctx, request)
@@ -232,7 +267,11 @@ func (s *Message) sendImage(ctx echo.Context, request dto.SendDocumentRequest) e
 	jid, err := numberToJid(request.Number)
 	if err != nil {
 		zap.L().Error("error converting number to jid", zap.Error(err))
-		return utils.HTTPFail(ctx, http.StatusBadRequest, err, "invalid number format")
+		return ctx.JSON(http.StatusBadRequest, dto.SendDocumentResponse{
+			Success: false,
+			Error:   "invalid number format",
+			Message: err.Error(),
+		})
 	}
 
 	sendData := &whatsmiau.SendImageRequest{
@@ -246,21 +285,17 @@ func (s *Message) sendImage(ctx echo.Context, request dto.SendDocumentRequest) e
 	c := ctx.Request().Context()
 	time.Sleep(time.Millisecond * time.Duration(request.Delay)) // TODO: create a more robust solution
 
-	res, err := s.whatsmiau.SendImage(c, sendData)
+	_, err = s.whatsmiau.SendImage(c, sendData)
 	if err != nil {
 		zap.L().Error("Whatsmiau.SendDocument failed", zap.Error(err))
-		return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to send document")
+		return ctx.JSON(http.StatusInternalServerError, dto.SendDocumentResponse{
+			Success: false,
+			Error:   "failed to send document",
+			Message: err.Error(),
+		})
 	}
 
 	return ctx.JSON(http.StatusOK, dto.SendDocumentResponse{
-		Key: dto.MessageResponseKey{
-			RemoteJid: request.Number,
-			FromMe:    true,
-			Id:        res.ID,
-		},
-		Status:           "sent",
-		MessageType:      "imageMessage",
-		MessageTimestamp: int(res.CreatedAt.Unix() / 1000),
-		InstanceId:       request.InstanceID,
+		Success: true,
 	})
 }

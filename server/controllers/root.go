@@ -41,9 +41,7 @@ func Root(ctx echo.Context) error {
 
 func Health(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, map[string]any{
-		"status":  "healthy",
-		"message": "API is running",
-		"timestamp": time.Now().Unix(),
+		"success": true,
 	})
 }
 
@@ -56,7 +54,11 @@ func HardReset(ctx echo.Context) error {
 	instances, err := repo.List(ctxReq, "")
 	if err != nil {
 		zap.L().Error("failed to list instances for hard reset", zap.Error(err))
-		return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to list instances")
+		return ctx.JSON(http.StatusInternalServerError, map[string]any{
+			"success": false,
+			"error":   "failed to list instances",
+			"message": err.Error(),
+		})
 	}
 
 	// Logout and delete all instances
@@ -89,9 +91,7 @@ func HardReset(ctx echo.Context) error {
 	}
 
 	return ctx.JSON(http.StatusOK, map[string]any{
-		"status":          "success",
-		"message":         "Hard reset completed. All instances and data have been deleted.",
-		"instancesDeleted": len(instances),
+		"success": true,
 	})
 }
 

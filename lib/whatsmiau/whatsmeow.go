@@ -391,6 +391,17 @@ func (s *Whatsmiau) Status(id string) (Status, error) {
 	return Closed, nil
 }
 
+// GetQRCode returns the QR code from cache if available
+func (s *Whatsmiau) GetQRCode(id string) (string, bool) {
+	return s.qrCache.Load(id)
+}
+
+// IsObserverRunning checks if the connection observer is currently running
+func (s *Whatsmiau) IsObserverRunning(id string) bool {
+	_, ok := s.observerRunning.Load(id)
+	return ok
+}
+
 func (s *Whatsmiau) Logout(ctx context.Context, id string) error {
 	client, ok := s.clients.Load(id)
 	if !ok {

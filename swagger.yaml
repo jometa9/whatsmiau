@@ -48,86 +48,62 @@ components:
     HealthResponse:
       type: object
       properties:
-        status:
-          type: string
-          example: healthy
-        message:
-          type: string
-          example: API is running
-        timestamp:
-          type: integer
-          format: int64
-          description: Unix timestamp
+        success:
+          type: boolean
+          example: true
     
     HardResetResponse:
       type: object
       properties:
-        status:
+        success:
+          type: boolean
+          example: true
+        error:
           type: string
-          example: success
+          description: Error description - what happened (only present if success is false)
         message:
           type: string
-          example: Hard reset completed. All instances and data have been deleted.
-        instancesDeleted:
-          type: integer
-          description: Number of instances deleted
+          description: Root cause error message - the actual error that triggered everything (only present if success is false)
     
     CreateInstanceRequest:
       type: object
-      description: Either 'id' or 'instanceName' must be provided
+      required:
+        - id
       properties:
         id:
           type: string
-          description: Instance ID (required if instanceName is not provided)
+          description: Instance ID
           example: my-instance
-        instanceName:
-          type: string
-          description: Instance name (required if id is not provided)
-          example: My Instance
-        rejectCall:
+    
+    CreateInstanceResponse:
+      type: object
+      properties:
+        success:
           type: boolean
-          description: Reject incoming calls
-        msgCall:
+          description: Whether the operation was successful
+          example: true
+        error:
           type: string
-          description: Message to send when rejecting calls
-        groupsIgnore:
+          description: Error description - what happened (only present if success is false)
+          example: "failed to create instance"
+        message:
+          type: string
+          description: Root cause error message - the actual error that triggered everything (only present if success is false)
+          example: "instance already exists"
+    
+    DeleteInstanceResponse:
+      type: object
+      properties:
+        success:
           type: boolean
-          description: Ignore group messages
-        alwaysOnline:
-          type: boolean
-          description: Keep instance always online
-        readMessages:
-          type: boolean
-          description: Automatically read messages
-        readStatus:
-          type: boolean
-          description: Automatically read status
-        syncFullHistory:
-          type: boolean
-          description: Sync full message history
-        syncRecentHistory:
-          type: boolean
-          description: Sync recent message history
-        remoteJID:
+          description: Whether the operation was successful
+          example: true
+        error:
           type: string
-          description: Remote JID
-        webhook:
-          $ref: '#/components/schemas/InstanceWebhook'
-        proxyHost:
+          description: Error description - what happened (only present if success is false)
+        message:
           type: string
-          description: Proxy host
-        proxyPort:
-          type: string
-          description: Proxy port
-        proxyProtocol:
-          type: string
-          description: Proxy protocol
-        proxyUsername:
-          type: string
-          description: Proxy username
-        proxyPassword:
-          type: string
-          description: Proxy password
+          description: Root cause error message - the actual error that triggered everything (only present if success is false)
     
     Instance:
       type: object
@@ -291,27 +267,16 @@ components:
     SendTextResponse:
       type: object
       properties:
-        key:
-          $ref: '#/components/schemas/MessageResponseKey'
-        pushName:
+        success:
+          type: boolean
+          description: Whether the operation was successful
+          example: true
+        error:
           type: string
-          description: Contact push name
-        status:
-          type: string
-          description: Message status
+          description: Error description - what happened (only present if success is false)
         message:
-          $ref: '#/components/schemas/SendTextResponseMessage'
-        contextInfo:
-          $ref: '#/components/schemas/SendTextResponseContextInfo'
-        messageType:
           type: string
-        messageTimestamp:
-          type: integer
-          format: int64
-        instanceId:
-          type: string
-        source:
-          type: string
+          description: Root cause error message - the actual error that triggered everything (only present if success is false)
     
     MessageResponseKey:
       type: object
@@ -384,25 +349,16 @@ components:
     SendAudioResponse:
       type: object
       properties:
-        contextInfo:
-          $ref: '#/components/schemas/MessageContextInfo'
-        instanceId:
+        success:
+          type: boolean
+          description: Whether the operation was successful
+          example: true
+        error:
           type: string
-        key:
-          $ref: '#/components/schemas/MessageResponseKey'
+          description: Error description - what happened (only present if success is false)
         message:
-          $ref: '#/components/schemas/SendAudioResponseMessage'
-        messageTimestamp:
-          type: integer
-          format: int64
-        messageType:
           type: string
-        pushName:
-          type: string
-        source:
-          type: string
-        status:
-          type: string
+          description: Root cause error message - the actual error that triggered everything (only present if success is false)
     
     MessageContextInfo:
       type: object
@@ -506,26 +462,16 @@ components:
     SendDocumentResponse:
       type: object
       properties:
-        key:
-          $ref: '#/components/schemas/MessageResponseKey'
-        pushName:
+        success:
+          type: boolean
+          description: Whether the operation was successful
+          example: true
+        error:
           type: string
-        status:
-          type: string
+          description: Error description - what happened (only present if success is false)
         message:
-          $ref: '#/components/schemas/SendDocumentResponseData'
-        contextInfo:
-          type: object
-          description: Context information (can be any object)
-        messageType:
           type: string
-        messageTimestamp:
-          type: integer
-          format: int64
-        instanceId:
-          type: string
-        source:
-          type: string
+          description: Root cause error message - the actual error that triggered everything (only present if success is false)
     
     SendDocumentResponseData:
       type: object
@@ -548,18 +494,34 @@ components:
     UpdateHeartbeatWebhookResponse:
       type: object
       properties:
-        url:
+        success:
+          type: boolean
+          description: Whether the operation was successful
+          example: true
+        error:
           type: string
-          format: uri
-          description: Updated webhook URL
+          description: Error description - what happened (only present if success is false)
+        message:
+          type: string
+          description: Root cause error message - the actual error that triggered everything (only present if success is false)
     
     GetHeartbeatWebhookResponse:
       type: object
       properties:
+        success:
+          type: boolean
+          description: Whether the operation was successful
+          example: true
+        error:
+          type: string
+          description: Error description - what happened (only present if success is false)
+        message:
+          type: string
+          description: Root cause error message - the actual error that triggered everything (only present if success is false)
         url:
           type: string
           format: uri
-          description: Current webhook URL
+          description: Current webhook URL (only present if success is true)
 
 paths:
   /health:
@@ -601,7 +563,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/HardResetResponse'
 
   /instance:
     post:
@@ -621,26 +583,36 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Instance'
+                $ref: '#/components/schemas/CreateInstanceResponse'
+              example:
+                success: true
         '400':
           description: Invalid request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/CreateInstanceResponse'
+              example:
+                success: false
+                error: "invalid request body"
+                message: "validation failed: field 'id' is required"
         '500':
           description: Server error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/CreateInstanceResponse'
+              example:
+                success: false
+                error: "database error"
+                message: "failed to create instance"
 
-  /instance/{id}/connect:
+  /instance/{id}:
     post:
       tags:
         - Instances
       summary: Connect instance and get QR code
-      description: Connect to a WhatsApp instance. Returns QR code in base64 format if not connected.
+      description: Connect to a WhatsApp instance. Returns QR code in base64 format if not connected. If already connected, returns connection status. If connection is in progress, returns the current QR code.
       parameters:
         - name: id
           in: path
@@ -668,37 +640,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-
-  /instance/connect/{id}/image:
-    get:
-      tags:
-        - Instances
-      summary: Get QR code as image
-      description: Get QR code as PNG image for connecting instance
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-          description: Instance ID
-          example: my-instance
-      responses:
-        '200':
-          description: QR code image
-          content:
-            image/png:
-              schema:
-                type: string
-                format: binary
-        '404':
-          description: Instance not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
-  /instance/{id}:
+    
     delete:
       tags:
         - Instances
@@ -714,26 +656,32 @@ paths:
           example: my-instance
       responses:
         '200':
-          description: Instance deleted successfully
+          description: Instance deleted successfully or not found
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        '404':
-          description: Instance not found
+                $ref: '#/components/schemas/DeleteInstanceResponse'
+              examples:
+                success:
+                  value:
+                    success: true
+                notFound:
+                  value:
+                    success: false
+                    error: "instance not found"
+                    message: "instance doesn't exists"
+        '400':
+          description: Invalid request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/DeleteInstanceResponse'
         '500':
           description: Server error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/DeleteInstanceResponse'
 
   /instance/{instance}/message/text:
     post:
@@ -767,13 +715,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/SendTextResponse'
         '500':
           description: Server error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/SendTextResponse'
 
   /instance/{instance}/message/audio:
     post:
@@ -807,13 +755,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/SendAudioResponse'
         '500':
           description: Server error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/SendAudioResponse'
 
   /instance/{instance}/message/document:
     post:
@@ -847,13 +795,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/SendDocumentResponse'
         '500':
           description: Server error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/SendDocumentResponse'
 
   /instance/{instance}/message/image:
     post:
@@ -887,13 +835,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/SendDocumentResponse'
         '500':
           description: Server error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/SendDocumentResponse'
 
   /webhook/heartbeat:
     get:
@@ -913,7 +861,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/GetHeartbeatWebhookResponse'
 
     put:
       tags:
@@ -938,11 +886,11 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/UpdateHeartbeatWebhookResponse'
         '500':
           description: Server error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: '#/components/schemas/UpdateHeartbeatWebhookResponse'
 

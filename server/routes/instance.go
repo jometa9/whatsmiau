@@ -13,7 +13,7 @@ func Instance(group *echo.Group) {
 	controller := controllers.NewInstances(instanceRepo, whatsmiau.Get())
 	group.POST("", controller.Create)
 	group.GET("", controller.List)
-	group.POST("/:id/connect", controller.Connect)
+	group.POST("/:id", controller.Connect)
 	group.POST("/:id/logout", controller.Logout)
 	group.DELETE("/:id", controller.Delete)
 	group.GET("/:id/status", controller.Status)
@@ -22,9 +22,7 @@ func Instance(group *echo.Group) {
 	group.POST("/create", controller.Create)
 	group.GET("/fetchInstances", controller.List)
 	group.GET("/connect/:id", controller.Connect)
-	group.GET("/connect/:id/image", controller.ConnectQRBuffer)
 	group.GET("/connectionState/:id", controller.Status)
 	group.DELETE("/logout/:id", controller.Logout)
 	group.DELETE("/delete/:id", controller.Delete)
-
 }
