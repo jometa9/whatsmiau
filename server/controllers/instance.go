@@ -2,14 +2,12 @@ package controllers
 
 import (
 	"encoding/base64"
-	"errors"
 	"math/rand/v2"
 	"net/http"
 
 	"github.com/verbeux-ai/whatsmiau/env"
 	"github.com/verbeux-ai/whatsmiau/lib/whatsmiau"
 	"github.com/verbeux-ai/whatsmiau/models"
-	"github.com/verbeux-ai/whatsmiau/repositories/instances"
 	"go.mau.fi/whatsmeow/types"
 
 	"github.com/go-playground/validator/v10"
@@ -72,38 +70,6 @@ func (s *Instance) Create(ctx echo.Context) error {
 
 	return ctx.JSON(http.StatusCreated, dto.CreateInstanceResponse{
 		Instance: request.Instance,
-	})
-}
-
-func (s *Instance) Update(ctx echo.Context) error {
-	var request dto.UpdateInstanceRequest
-	if err := ctx.Bind(&request); err != nil {
-		return utils.HTTPFail(ctx, http.StatusUnprocessableEntity, err, "failed to bind request body")
-	}
-
-	if err := validator.New().Struct(&request); err != nil {
-		return utils.HTTPFail(ctx, http.StatusBadRequest, err, "invalid request body")
-	}
-
-	c := ctx.Request().Context()
-	instance, err := s.repo.Update(c, request.ID, &models.Instance{
-		ID: request.ID,
-		Webhook: models.InstanceWebhook{
-			Url:    request.Webhook.URL,
-			Base64: request.Webhook.Base64,
-			Events: request.Webhook.Events,
-		},
-	})
-	if err != nil {
-		if errors.Is(err, instances.ErrorNotFound) {
-			return utils.HTTPFail(ctx, http.StatusNotFound, err, "instance not found")
-		}
-		zap.L().Error("failed to create instance", zap.Error(err))
-		return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to update instance")
-	}
-
-	return ctx.JSON(http.StatusCreated, dto.UpdateInstanceResponse{
-		Instance: instance,
 	})
 }
 

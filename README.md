@@ -179,11 +179,9 @@ Same Pattern: https://www.postman.com/agenciadgcode/evolution-api/overview
 | GET    | /v1/instance/connectionState/:id   | Get instance status         |
 | DELETE | /v1/instance/logout/:id            | Logout from an instance     |
 | DELETE | /v1/instance/delete/:id            | Delete an instance          |
-| PUT    | /v1/instance/update/:id            | Update an instance          |
 | POST   | /v1/message/sendText/:instance     | Send a text message         |
 | POST   | /v1/message/sendWhatsAppAudio/:instance | Send an audio message       |
 | POST   | /v1/message/sendMedia/:instance    | Send a media message        |
-| POST   | /v1/message/sendReaction/:instance | Send a reaction to a message |
 | POST   | /v1/chat/markMessageAsRead/:instance | Mark messages as read       |
 | POST   | /v1/chat/sendPresence/:instance    | Send chat presence          |
 | POST   | /v1/chat/whatsappNumbers/:instance | Check if a number is on WhatsApp |
@@ -200,105 +198,52 @@ The application can send webhook events for the following actions:
 
 ## Webhook Configuration
 
-You can configure a webhook URL for each instance to receive events. When a webhook URL is configured, all events will be sent to that URL as HTTP POST requests.
+All instances use the same global webhook URL for sending events. This webhook URL is shared between instance events (incoming messages) and system heartbeat metrics. When a webhook URL is configured, all events from all instances will be sent to that URL as HTTP POST requests.
 
-### Configure Webhook for an Instance
+**Important:** The webhook URL can be configured dynamically via API at runtime, which is the recommended way for production environments.
 
-To set or update the webhook URL for an instance, use the update endpoint:
+### Global Webhook URL Configuration
 
-```bash
-curl -X PUT 'http://localhost:8080/v1/instance/update/my-instance' \
-  -H 'Content-Type: application/json' \
-  -H 'apikey: YOUR_API_KEY' \
-  -d '{
-    "webhook": {
-      "url": "https://your-webhook-url.com/webhook",
-      "base64": false,
-      "events": ["MESSAGES_UPSERT", "MESSAGES_UPDATE", "CONTACTS_UPSERT"]
-    }
-  }'
-```
+The webhook URL is configured globally and used by both instance events and heartbeat. You can configure it in three ways (listed in priority order):
 
-### Parameters
+#### 1. Update Dynamically via API (Recommended for Production)
 
-- `url` (required): The webhook URL where events will be sent
-- `base64` (optional): Whether to send media in base64 format (default: false)
-- `events` (optional): Array of events to receive. If not specified or empty, all events will be sent:
-  - `MESSAGES_UPSERT`: New messages
-  - `MESSAGES_UPDATE`: Message status updates
-  - `CONTACTS_UPSERT`: Contact updates
-
-### Example: Configure webhook to receive all events
-
-If you don't specify the `events` array or leave it empty, all events will be sent:
+Update the webhook URL at runtime using the API. This method has the highest priority and allows you to change the webhook URL without restarting the service:
 
 ```bash
-curl -X PUT 'http://localhost:8080/v1/instance/update/my-instance' \
-  -H 'Content-Type: application/json' \
-  -H 'apikey: YOUR_API_KEY' \
-  -d '{
-    "webhook": {
-      "url": "https://your-webhook-url.com/webhook"
-    }
-  }'
-```
-
-### Example: Configure webhook to receive only specific events
-
-```bash
-curl -X PUT 'http://localhost:8080/v1/instance/update/my-instance' \
-  -H 'Content-Type: application/json' \
-  -H 'apikey: YOUR_API_KEY' \
-  -d '{
-    "webhook": {
-      "url": "https://your-webhook-url.com/webhook",
-      "events": ["MESSAGES_UPSERT"]
-    }
-  }'
-```
-
-## Heartbeat Webhook Configuration
-
-The heartbeat webhook sends system metrics (CPU, memory, etc.) every minute. You can configure it in three ways:
-
-### 1. Inject at Build Time (Recommended)
-
-Inject the webhook URL when building the binary:
-
-```bash
-WEBHOOK_URL=https://your-webhook.com/metrics ./build-linux.sh docker
-```
-
-The URL will be embedded in the binary and used by default.
-
-### 2. Set via Environment Variable
-
-Set `WEBHOOK_URL` in your `.env` file or as a system environment variable:
-
-```bash
-WEBHOOK_URL=https://your-webhook.com/metrics
-```
-
-### 3. Update Dynamically via API
-
-Update the heartbeat webhook URL at runtime using the API:
-
-```bash
-# Update heartbeat webhook URL
+# Update webhook URL (used for both instance events and heartbeat)
 curl -X PUT 'http://localhost:8080/v1/webhook/heartbeat' \
   -H 'Content-Type: application/json' \
   -H 'apikey: YOUR_API_KEY' \
   -d '{
-    "url": "https://your-new-webhook.com/metrics"
+    "url": "https://your-webhook.com/webhook"
   }'
 
-# Get current heartbeat webhook URL
+# Get current webhook URL
 curl -X GET 'http://localhost:8080/v1/webhook/heartbeat' \
   -H 'apikey: YOUR_API_KEY'
 ```
 
+#### 2. Set via Environment Variable
+
+Set `WEBHOOK_URL` in your `.env` file or as a system environment variable:
+
+```bash
+WEBHOOK_URL=https://your-webhook.com/webhook
+```
+
+#### 3. Inject at Build Time
+
+Inject the webhook URL when building the binary:
+
+```bash
+WEBHOOK_URL=https://your-webhook.com/webhook ./build-linux.sh docker
+```
+
+The URL will be embedded in the binary and used by default.
+
 **Priority order:**
-1. Dynamic URL (set via API) - highest priority
+1. Dynamic URL (set via API) - **highest priority**
 2. Environment variable (`WEBHOOK_URL`)
 3. Build-time injected URL - lowest priority
 

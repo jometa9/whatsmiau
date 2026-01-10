@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"net/http"
-	"regexp"
 	"time"
 
 	"github.com/go-playground/validator/v10"
@@ -262,55 +261,6 @@ func (s *Message) sendImage(ctx echo.Context, request dto.SendDocumentRequest) e
 		Status:           "sent",
 		MessageType:      "imageMessage",
 		MessageTimestamp: int(res.CreatedAt.Unix() / 1000),
-		InstanceId:       request.InstanceID,
-	})
-}
-
-func (s *Message) SendReaction(ctx echo.Context) error {
-	var request dto.SendReactionRequest
-	if err := ctx.Bind(&request); err != nil {
-		return utils.HTTPFail(ctx, http.StatusUnprocessableEntity, err, "failed to bind request body")
-	}
-
-	if err := validator.New().Struct(&request); err != nil {
-		return utils.HTTPFail(ctx, http.StatusBadRequest, err, "invalid request body")
-	}
-
-	jid, err := numberToJid(request.Key.RemoteJid)
-	if err != nil {
-		zap.L().Error("error converting number to jid", zap.Error(err))
-		return utils.HTTPFail(ctx, http.StatusBadRequest, err, "invalid number format")
-	}
-
-	var emojiRegex = regexp.MustCompile(`[\x{1F600}-\x{1F64F}]|[\x{1F300}-\x{1F5FF}]|[\x{1F680}-\x{1F6FF}]|[\x{2600}-\x{26FF}]|[\x{2700}-\x{27BF}]`)
-	if !emojiRegex.MatchString(request.Reaction) {
-		return utils.HTTPFail(ctx, http.StatusBadRequest, err, "invalid reaction, must be a emoji")
-	}
-
-	sendReaction := &whatsmiau.SendReactionRequest{
-		InstanceID: request.InstanceID,
-		Reaction:   request.Reaction,
-		RemoteJID:  jid,
-		MessageID:  request.Key.Id,
-		FromMe:     request.Key.FromMe,
-	}
-
-	c := ctx.Request().Context()
-	res, err := s.whatsmiau.SendReaction(c, sendReaction)
-	if err != nil {
-		zap.L().Error("Whatsmiau.SendReaction failed", zap.Error(err))
-		return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to send reaction")
-	}
-
-	return ctx.JSON(http.StatusOK, dto.SendReactionResponse{
-		Key: dto.MessageResponseKey{
-			RemoteJid: request.Key.RemoteJid,
-			FromMe:    true,
-			Id:        res.ID,
-		},
-		Status:           "sent",
-		MessageType:      "reactionMessage",
-		MessageTimestamp: int(res.CreatedAt.UnixMicro() / 1000),
 		InstanceId:       request.InstanceID,
 	})
 }

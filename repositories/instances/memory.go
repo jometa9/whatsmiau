@@ -58,9 +58,10 @@ func (s *MemoryInstance) Update(ctx context.Context, id string, toUpdate *models
 	if len(toUpdate.RemoteJID) > 0 {
 		oldInstance.RemoteJID = toUpdate.RemoteJID
 	}
-	if toUpdate.Webhook.Url != "" {
-		oldInstance.Webhook.Url = toUpdate.Webhook.Url
-	}
+	// Webhook.Url is no longer configurable per instance - it uses the global webhook URL
+	// if toUpdate.Webhook.Url != "" {
+	// 	oldInstance.Webhook.Url = toUpdate.Webhook.Url
+	// }
 	if toUpdate.Webhook.ByEvents != nil {
 		oldInstance.Webhook.ByEvents = toUpdate.Webhook.ByEvents
 	}

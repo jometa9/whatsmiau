@@ -13,6 +13,7 @@ import (
 
 	"github.com/emersion/go-vcard"
 	"github.com/google/uuid"
+	"github.com/verbeux-ai/whatsmiau/env"
 	"github.com/verbeux-ai/whatsmiau/models"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
@@ -167,7 +168,21 @@ func (s *Whatsmiau) Handle(id string) whatsmeow.EventHandler {
 
 func (s *Whatsmiau) handleLoggedOut(id string) {
 	instance := s.getInstanceCached(id)
-	if instance == nil || instance.Webhook.Url == "" {
+	if instance == nil {
+		// No instance found, just cleanup
+		client, ok := s.clients.Load(id)
+		if ok {
+			if err := s.deleteDeviceIfExists(context.Background(), client); err != nil {
+				zap.L().Error("failed to delete device for instance", zap.String("instance", id), zap.Error(err))
+				return
+			}
+		}
+		s.clients.Delete(id)
+		return
+	}
+
+	webhookURL := env.GetWebhookURL()
+	if webhookURL == "" {
 		// No webhook configured, just cleanup
 		client, ok := s.clients.Load(id)
 		if ok {
@@ -193,7 +208,7 @@ func (s *Whatsmiau) handleLoggedOut(id string) {
 		Event:    WookSessionDisconnect,
 	}
 
-	s.emit(wookEvent, instance.Webhook.Url)
+	s.emit(wookEvent, webhookURL)
 
 	// Cleanup
 	client, ok := s.clients.Load(id)
@@ -218,8 +233,9 @@ func (s *Whatsmiau) handleMessageEvent(id string, instance *models.Instance, e *
 		return
 	}
 
-	// Check if webhook URL is configured
-	if instance.Webhook.Url == "" {
+	// Get webhook URL from global configuration
+	webhookURL := env.GetWebhookURL()
+	if webhookURL == "" {
 		return
 	}
 
@@ -248,7 +264,7 @@ func (s *Whatsmiau) handleMessageEvent(id string, instance *models.Instance, e *
 		zap.L().Debug("message event", zap.String("instance", id), zap.Any("data", wookMessage.Data))
 	}
 
-	s.emit(wookMessage, instance.Webhook.Url)
+	s.emit(wookMessage, webhookURL)
 }
 
 func (s *Whatsmiau) handleReceiptEvent(id string, instance *models.Instance, e *events.Receipt, eventMap map[string]bool) {

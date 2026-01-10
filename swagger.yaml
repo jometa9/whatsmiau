@@ -30,6 +30,536 @@ components:
       in: header
       name: apikey
       description: API key for authentication
+  
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error details
+        message:
+          type: string
+          description: Error message
+        errorMessage:
+          type: string
+          description: Detailed error message
+    
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: healthy
+        message:
+          type: string
+          example: API is running
+        timestamp:
+          type: integer
+          format: int64
+          description: Unix timestamp
+    
+    HardResetResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        message:
+          type: string
+          example: Hard reset completed. All instances and data have been deleted.
+        instancesDeleted:
+          type: integer
+          description: Number of instances deleted
+    
+    CreateInstanceRequest:
+      type: object
+      description: Either 'id' or 'instanceName' must be provided
+      properties:
+        id:
+          type: string
+          description: Instance ID (required if instanceName is not provided)
+          example: my-instance
+        instanceName:
+          type: string
+          description: Instance name (required if id is not provided)
+          example: My Instance
+        rejectCall:
+          type: boolean
+          description: Reject incoming calls
+        msgCall:
+          type: string
+          description: Message to send when rejecting calls
+        groupsIgnore:
+          type: boolean
+          description: Ignore group messages
+        alwaysOnline:
+          type: boolean
+          description: Keep instance always online
+        readMessages:
+          type: boolean
+          description: Automatically read messages
+        readStatus:
+          type: boolean
+          description: Automatically read status
+        syncFullHistory:
+          type: boolean
+          description: Sync full message history
+        syncRecentHistory:
+          type: boolean
+          description: Sync recent message history
+        remoteJID:
+          type: string
+          description: Remote JID
+        webhook:
+          $ref: '#/components/schemas/InstanceWebhook'
+        proxyHost:
+          type: string
+          description: Proxy host
+        proxyPort:
+          type: string
+          description: Proxy port
+        proxyProtocol:
+          type: string
+          description: Proxy protocol
+        proxyUsername:
+          type: string
+          description: Proxy username
+        proxyPassword:
+          type: string
+          description: Proxy password
+    
+    Instance:
+      type: object
+      properties:
+        id:
+          type: string
+          example: my-instance
+        rejectCall:
+          type: boolean
+        msgCall:
+          type: string
+        groupsIgnore:
+          type: boolean
+        alwaysOnline:
+          type: boolean
+        readMessages:
+          type: boolean
+        readStatus:
+          type: boolean
+        syncFullHistory:
+          type: boolean
+        syncRecentHistory:
+          type: boolean
+        remoteJID:
+          type: string
+        webhook:
+          $ref: '#/components/schemas/InstanceWebhook'
+        proxyHost:
+          type: string
+        proxyPort:
+          type: string
+        proxyProtocol:
+          type: string
+        proxyUsername:
+          type: string
+        proxyPassword:
+          type: string
+    
+    InstanceWebhook:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+        byEvents:
+          type: boolean
+        base64:
+          type: boolean
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+        events:
+          type: array
+          items:
+            type: string
+    
+    ConnectInstanceResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Connection status message
+        connected:
+          type: boolean
+          description: Whether the instance is connected
+        base64:
+          type: string
+          description: QR code in base64 format (if not connected)
+        id:
+          type: string
+        rejectCall:
+          type: boolean
+        msgCall:
+          type: string
+        groupsIgnore:
+          type: boolean
+        alwaysOnline:
+          type: boolean
+        readMessages:
+          type: boolean
+        readStatus:
+          type: boolean
+        syncFullHistory:
+          type: boolean
+        syncRecentHistory:
+          type: boolean
+        remoteJID:
+          type: string
+        webhook:
+          $ref: '#/components/schemas/InstanceWebhook'
+        proxyHost:
+          type: string
+        proxyPort:
+          type: string
+        proxyProtocol:
+          type: string
+        proxyUsername:
+          type: string
+        proxyPassword:
+          type: string
+    
+    SendTextRequest:
+      type: object
+      required:
+        - number
+        - text
+      properties:
+        number:
+          type: string
+          description: Phone number (JID format)
+          example: "1234567890@s.whatsapp.net"
+        text:
+          type: string
+          description: Message text
+          example: Hello, this is a test message
+        delay:
+          type: integer
+          description: Delay in milliseconds (0-300000)
+          minimum: 0
+          maximum: 300000
+          default: 0
+        quoted:
+          $ref: '#/components/schemas/MessageRequestQuoted'
+        linkPreview:
+          type: boolean
+          description: Enable link preview
+          default: false
+        mentionsEveryOne:
+          type: boolean
+          description: Mention everyone in group
+          default: false
+        mentioned:
+          type: array
+          items:
+            type: string
+          description: List of JIDs to mention
+    
+    MessageRequestQuoted:
+      type: object
+      properties:
+        key:
+          $ref: '#/components/schemas/QuotedKey'
+        message:
+          $ref: '#/components/schemas/QuotedMessage'
+    
+    QuotedKey:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Message ID to quote
+    
+    QuotedMessage:
+      type: object
+      properties:
+        conversation:
+          type: string
+          description: Quoted message text
+    
+    SendTextResponse:
+      type: object
+      properties:
+        key:
+          $ref: '#/components/schemas/MessageResponseKey'
+        pushName:
+          type: string
+          description: Contact push name
+        status:
+          type: string
+          description: Message status
+        message:
+          $ref: '#/components/schemas/SendTextResponseMessage'
+        contextInfo:
+          $ref: '#/components/schemas/SendTextResponseContextInfo'
+        messageType:
+          type: string
+        messageTimestamp:
+          type: integer
+          format: int64
+        instanceId:
+          type: string
+        source:
+          type: string
+    
+    MessageResponseKey:
+      type: object
+      properties:
+        remoteJid:
+          type: string
+        fromMe:
+          type: boolean
+        id:
+          type: string
+    
+    SendTextResponseMessage:
+      type: object
+      properties:
+        conversation:
+          type: string
+    
+    SendTextResponseContextInfo:
+      type: object
+      properties:
+        participant:
+          type: string
+        stanzaId:
+          type: string
+        quotedMessage:
+          $ref: '#/components/schemas/ContextInfoQuotedMessage'
+    
+    ContextInfoQuotedMessage:
+      type: object
+      properties:
+        conversation:
+          type: string
+    
+    SendAudioRequest:
+      type: object
+      required:
+        - number
+        - audio
+      properties:
+        number:
+          type: string
+          description: Phone number (JID format)
+          example: "1234567890@s.whatsapp.net"
+        audio:
+          type: string
+          description: Audio file URL or base64 encoded audio
+          example: https://example.com/audio.mp3
+        delay:
+          type: integer
+          description: Delay in milliseconds (0-300000)
+          minimum: 0
+          maximum: 300000
+          default: 0
+        quoted:
+          $ref: '#/components/schemas/MessageRequestQuoted'
+        mentionsEveryOne:
+          type: boolean
+          description: Mention everyone in group
+          default: false
+        mentioned:
+          type: array
+          items:
+            type: string
+          description: List of JIDs to mention
+        encoding:
+          type: boolean
+          description: Enable audio encoding
+          default: false
+    
+    SendAudioResponse:
+      type: object
+      properties:
+        contextInfo:
+          $ref: '#/components/schemas/MessageContextInfo'
+        instanceId:
+          type: string
+        key:
+          $ref: '#/components/schemas/MessageResponseKey'
+        message:
+          $ref: '#/components/schemas/SendAudioResponseMessage'
+        messageTimestamp:
+          type: integer
+          format: int64
+        messageType:
+          type: string
+        pushName:
+          type: string
+        source:
+          type: string
+        status:
+          type: string
+    
+    MessageContextInfo:
+      type: object
+      properties:
+        messageSecret:
+          type: string
+        deviceListMetadata:
+          $ref: '#/components/schemas/DeviceListMetadata'
+        deviceListMetadataVersion:
+          type: integer
+    
+    DeviceListMetadata:
+      type: object
+      properties:
+        senderKeyHash:
+          type: string
+        senderTimestamp:
+          type: string
+        recipientKeyHash:
+          type: string
+        recipientTimestamp:
+          type: string
+    
+    SendAudioResponseMessage:
+      type: object
+      properties:
+        audioMessage:
+          $ref: '#/components/schemas/SendAudioResponseMessageAudio'
+        base64:
+          type: string
+    
+    SendAudioResponseMessageAudio:
+      type: object
+      properties:
+        directPath:
+          type: string
+        fileEncSha256:
+          type: string
+        fileLength:
+          type: string
+        fileSha256:
+          type: string
+        mediaKey:
+          type: string
+        mediaKeyTimestamp:
+          type: string
+        mimetype:
+          type: string
+        ptt:
+          type: boolean
+        seconds:
+          type: integer
+        url:
+          type: string
+        waveform:
+          type: string
+    
+    SendDocumentRequest:
+      type: object
+      required:
+        - number
+        - media
+      properties:
+        number:
+          type: string
+          description: Phone number (JID format)
+          example: "1234567890@s.whatsapp.net"
+        mimetype:
+          type: string
+          description: MIME type of the document
+          example: application/pdf
+        caption:
+          type: string
+          description: Caption for the document
+        media:
+          type: string
+          description: URL of the file to send
+          example: https://example.com/document.pdf
+        fileName:
+          type: string
+          description: Name of the file
+          example: document.pdf
+        delay:
+          type: integer
+          description: Delay in milliseconds (0-300000)
+          minimum: 0
+          maximum: 300000
+          default: 0
+        quoted:
+          $ref: '#/components/schemas/MessageRequestQuoted'
+        mentionsEveryOne:
+          type: boolean
+          description: Mention everyone in group
+          default: false
+        mentioned:
+          type: array
+          items:
+            type: string
+          description: List of JIDs to mention
+    
+    SendDocumentResponse:
+      type: object
+      properties:
+        key:
+          $ref: '#/components/schemas/MessageResponseKey'
+        pushName:
+          type: string
+        status:
+          type: string
+        message:
+          $ref: '#/components/schemas/SendDocumentResponseData'
+        contextInfo:
+          type: object
+          description: Context information (can be any object)
+        messageType:
+          type: string
+        messageTimestamp:
+          type: integer
+          format: int64
+        instanceId:
+          type: string
+        source:
+          type: string
+    
+    SendDocumentResponseData:
+      type: object
+      properties:
+        base64:
+          type: string
+          description: Base64 encoded document data
+    
+    UpdateHeartbeatWebhookRequest:
+      type: object
+      required:
+        - url
+      properties:
+        url:
+          type: string
+          format: uri
+          description: Webhook URL for heartbeat and instance events
+          example: https://example.com/webhook
+    
+    UpdateHeartbeatWebhookResponse:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+          description: Updated webhook URL
+    
+    GetHeartbeatWebhookResponse:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+          description: Current webhook URL
 
 paths:
   /health:
@@ -163,46 +693,6 @@ paths:
                 format: binary
         '404':
           description: Instance not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
-  /instance/update/{id}:
-    put:
-      tags:
-        - Instances
-      summary: Update instance webhook
-      description: Configure webhook URL for an instance to receive WhatsApp events
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-          description: Instance ID
-          example: my-instance
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateInstanceWebhookRequest'
-      responses:
-        '200':
-          description: Webhook updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Instance'
-        '404':
-          description: Instance not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '400':
-          description: Invalid request
           content:
             application/json:
               schema:
@@ -405,52 +895,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /message/sendReaction/{instance}:
-    post:
-      tags:
-        - Messages
-      summary: Send reaction
-      description: Send a reaction (emoji) to a message
-      parameters:
-        - name: instance
-          in: path
-          required: true
-          schema:
-            type: string
-          description: Instance ID
-          example: my-instance
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SendReactionRequest'
-      responses:
-        '200':
-          description: Reaction sent successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SendReactionResponse'
-        '400':
-          description: Invalid request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '500':
-          description: Server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-
   /webhook/heartbeat:
     get:
       tags:
         - Webhooks
-      summary: Get heartbeat webhook URL
-      description: Get the current heartbeat webhook URL configuration
+      summary: Get global webhook URL
+      description: Get the current global webhook URL configuration. This URL is used for both system heartbeat metrics and all instance events (incoming messages).
       responses:
         '200':
           description: Current heartbeat webhook URL
@@ -468,8 +918,8 @@ paths:
     put:
       tags:
         - Webhooks
-      summary: Update heartbeat webhook URL
-      description: Configure the webhook URL for system metrics (heartbeat). This webhook receives system metrics every minute.
+      summary: Update global webhook URL
+      description: Configure the global webhook URL used for both system metrics (heartbeat) and all instance events (incoming messages). This URL is shared across all instances and the heartbeat service. The webhook receives system metrics every minute and all incoming message events from all instances.
       requestBody:
         required: true
         content:
