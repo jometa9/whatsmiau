@@ -6,6 +6,11 @@
 
 set -e
 
+# Create build directory if it doesn't exist
+BUILD_DIR="linux-build"
+mkdir -p "$BUILD_DIR"
+OUTPUT_FILE="$BUILD_DIR/whatsmiau-linux"
+
 if [ "$1" = "docker" ]; then
     echo "Building using Docker (recommended)..."
     echo "   Creating static self-contained binary (no system dependencies required)"
@@ -21,18 +26,19 @@ if [ "$1" = "docker" ]; then
         sh -c "
             apk add --no-cache gcc musl-dev sqlite-dev build-base && \
             go mod download && \
-            CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags '-w -s -X github.com/verbeux-ai/whatsmiau/env.BuildWebhookURL=\"$BUILD_WEBHOOK_URL\" -linkmode external -extldflags \"-static\"' -o whatsmiau-linux main.go || \
-            CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags '-w -s -X github.com/verbeux-ai/whatsmiau/env.BuildWebhookURL=\"$BUILD_WEBHOOK_URL\"' -o whatsmiau-linux main.go
+            mkdir -p $BUILD_DIR && \
+            (CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags '-w -s -X github.com/verbeux-ai/whatsmiau/env.BuildWebhookURL=\"$BUILD_WEBHOOK_URL\" -linkmode external -extldflags \"-static\"' -o $OUTPUT_FILE main.go || \
+            CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags '-w -s -X github.com/verbeux-ai/whatsmiau/env.BuildWebhookURL=\"$BUILD_WEBHOOK_URL\"' -o $OUTPUT_FILE main.go)
         "
     
     if [ $? -eq 0 ]; then
         echo "Build successful with Docker!"
-        echo "Executable created: whatsmiau-linux"
-        ls -lh whatsmiau-linux
+        echo "Executable created: $OUTPUT_FILE"
+        ls -lh "$OUTPUT_FILE"
         echo ""
         echo "The executable is ready to use on Linux"
         echo "   Static self-contained binary - NO need to install anything on the server"
-        echo "   To transfer: scp whatsmiau-linux user@server:/destination/path/"
+        echo "   To transfer: scp $OUTPUT_FILE user@server:/destination/path/"
         echo ""
         echo "On the Linux server you only need:"
         echo "   1. chmod +x whatsmiau-linux"
@@ -62,15 +68,15 @@ else
     fi
     
     # Build with CGO enabled (may require system libraries)
-    CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags "-w -s -X github.com/verbeux-ai/whatsmiau/env.BuildWebhookURL=$BUILD_WEBHOOK_URL" -o whatsmiau-linux main.go
+    CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags "-w -s -X github.com/verbeux-ai/whatsmiau/env.BuildWebhookURL=$BUILD_WEBHOOK_URL" -o "$OUTPUT_FILE" main.go
     
     if [ $? -eq 0 ]; then
         echo "Build successful!"
-        echo "Executable created: whatsmiau-linux"
-        ls -lh whatsmiau-linux
+        echo "Executable created: $OUTPUT_FILE"
+        ls -lh "$OUTPUT_FILE"
         echo ""
         echo "The executable is ready to use on Linux"
-        echo "   To transfer: scp whatsmiau-linux user@server:/destination/path/"
+        echo "   To transfer: scp $OUTPUT_FILE user@server:/destination/path/"
         echo ""
         echo "Note: This executable may require C libraries on the Linux server."
         echo "   For a completely self-contained binary, use: ./build-linux.sh docker"

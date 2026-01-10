@@ -2,4 +2,4 @@
 .env
 *.json
 *.db
-whatsmiau-linux
+linux-build/
