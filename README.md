@@ -198,6 +198,109 @@ The application can send webhook events for the following actions:
 | `MESSAGES_UPDATE` | Triggered when a message status changes (e.g., read). |
 | `CONTACTS_UPSERT` | Triggered when a contact is created or updated.     |
 
+## Webhook Configuration
+
+You can configure a webhook URL for each instance to receive events. When a webhook URL is configured, all events will be sent to that URL as HTTP POST requests.
+
+### Configure Webhook for an Instance
+
+To set or update the webhook URL for an instance, use the update endpoint:
+
+```bash
+curl -X PUT 'http://localhost:8080/v1/instance/update/my-instance' \
+  -H 'Content-Type: application/json' \
+  -H 'apikey: YOUR_API_KEY' \
+  -d '{
+    "webhook": {
+      "url": "https://your-webhook-url.com/webhook",
+      "base64": false,
+      "events": ["MESSAGES_UPSERT", "MESSAGES_UPDATE", "CONTACTS_UPSERT"]
+    }
+  }'
+```
+
+### Parameters
+
+- `url` (required): The webhook URL where events will be sent
+- `base64` (optional): Whether to send media in base64 format (default: false)
+- `events` (optional): Array of events to receive. If not specified or empty, all events will be sent:
+  - `MESSAGES_UPSERT`: New messages
+  - `MESSAGES_UPDATE`: Message status updates
+  - `CONTACTS_UPSERT`: Contact updates
+
+### Example: Configure webhook to receive all events
+
+If you don't specify the `events` array or leave it empty, all events will be sent:
+
+```bash
+curl -X PUT 'http://localhost:8080/v1/instance/update/my-instance' \
+  -H 'Content-Type: application/json' \
+  -H 'apikey: YOUR_API_KEY' \
+  -d '{
+    "webhook": {
+      "url": "https://your-webhook-url.com/webhook"
+    }
+  }'
+```
+
+### Example: Configure webhook to receive only specific events
+
+```bash
+curl -X PUT 'http://localhost:8080/v1/instance/update/my-instance' \
+  -H 'Content-Type: application/json' \
+  -H 'apikey: YOUR_API_KEY' \
+  -d '{
+    "webhook": {
+      "url": "https://your-webhook-url.com/webhook",
+      "events": ["MESSAGES_UPSERT"]
+    }
+  }'
+```
+
+## Heartbeat Webhook Configuration
+
+The heartbeat webhook sends system metrics (CPU, memory, etc.) every minute. You can configure it in three ways:
+
+### 1. Inject at Build Time (Recommended)
+
+Inject the webhook URL when building the binary:
+
+```bash
+WEBHOOK_URL=https://your-webhook.com/metrics ./build-linux.sh docker
+```
+
+The URL will be embedded in the binary and used by default.
+
+### 2. Set via Environment Variable
+
+Set `WEBHOOK_URL` in your `.env` file or as a system environment variable:
+
+```bash
+WEBHOOK_URL=https://your-webhook.com/metrics
+```
+
+### 3. Update Dynamically via API
+
+Update the heartbeat webhook URL at runtime using the API:
+
+```bash
+# Update heartbeat webhook URL
+curl -X PUT 'http://localhost:8080/v1/webhook/heartbeat' \
+  -H 'Content-Type: application/json' \
+  -H 'apikey: YOUR_API_KEY' \
+  -d '{
+    "url": "https://your-new-webhook.com/metrics"
+  }'
+
+# Get current heartbeat webhook URL
+curl -X GET 'http://localhost:8080/v1/webhook/heartbeat' \
+  -H 'apikey: YOUR_API_KEY'
+```
+
+**Priority order:**
+1. Dynamic URL (set via API) - highest priority
+2. Environment variable (`WEBHOOK_URL`)
+3. Build-time injected URL - lowest priority
 
 ## Did you like project?
 Donate: https://buy.stripe.com/8x28wI5vKfPbe9b8ih1VK0f

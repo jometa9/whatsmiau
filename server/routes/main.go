@@ -16,6 +16,7 @@ func V1(group *echo.Group) {
 	Instance(group.Group("/instance"))
 	Message(group.Group("/instance/:instance/message"))
 	Chat(group.Group("/instance/:instance/chat"))
+	Webhook(group.Group("/webhook"))
 
 	ChatEVO(group.Group("/chat"))
 	MessageEVO(group.Group("/message"))

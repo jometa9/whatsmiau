@@ -1,0 +1,498 @@
+openapi: 3.0.3
+info:
+  title: PingQR API
+  description: PingQR API service
+  version: 0.3.2
+
+servers:
+  - url: http://localhost:8080/v1
+    description: Local development server
+  - url: https://api.example.com/v1
+    description: Production server
+
+tags:
+  - name: Instances
+    description: Instance management operations
+  - name: Messages
+    description: Send messages operations
+  - name: Webhooks
+    description: Webhook configuration
+  - name: System
+    description: System operations
+
+security:
+  - ApiKeyAuth: []
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: apikey
+      description: API key for authentication
+
+paths:
+  /health:
+    get:
+      tags:
+        - System
+      summary: Health check
+      description: Check if the API is running and healthy
+      security: []
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '500':
+          description: API is not healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /hard-reset:
+    post:
+      tags:
+        - System
+      summary: Hard reset
+      description: Emergency endpoint that deletes all instances and clears all stored data. This will reset the API to its initial state with no data.
+      responses:
+        '200':
+          description: Hard reset completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HardResetResponse'
+        '500':
+          description: Error during hard reset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /instance:
+    post:
+      tags:
+        - Instances
+      summary: Create instance
+      description: Create a new WhatsApp instance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInstanceRequest'
+      responses:
+        '201':
+          description: Instance created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Instance'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /instance/{id}/connect:
+    post:
+      tags:
+        - Instances
+      summary: Connect instance and get QR code
+      description: Connect to a WhatsApp instance. Returns QR code in base64 format if not connected.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Instance ID
+          example: my-instance
+      responses:
+        '200':
+          description: Connection response with QR code or connection status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectInstanceResponse'
+        '404':
+          description: Instance not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /instance/connect/{id}/image:
+    get:
+      tags:
+        - Instances
+      summary: Get QR code as image
+      description: Get QR code as PNG image for connecting instance
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Instance ID
+          example: my-instance
+      responses:
+        '200':
+          description: QR code image
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Instance not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /instance/update/{id}:
+    put:
+      tags:
+        - Instances
+      summary: Update instance webhook
+      description: Configure webhook URL for an instance to receive WhatsApp events
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Instance ID
+          example: my-instance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateInstanceWebhookRequest'
+      responses:
+        '200':
+          description: Webhook updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Instance'
+        '404':
+          description: Instance not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /instance/{id}:
+    delete:
+      tags:
+        - Instances
+      summary: Delete instance
+      description: Delete a WhatsApp instance
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Instance ID
+          example: my-instance
+      responses:
+        '200':
+          description: Instance deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '404':
+          description: Instance not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /instance/{instance}/message/text:
+    post:
+      tags:
+        - Messages
+      summary: Send text message
+      description: Send a text message to a phone number
+      parameters:
+        - name: instance
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Instance ID
+          example: my-instance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendTextRequest'
+      responses:
+        '200':
+          description: Message sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SendTextResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /instance/{instance}/message/audio:
+    post:
+      tags:
+        - Messages
+      summary: Send audio message
+      description: Send an audio message (voice note) to a phone number
+      parameters:
+        - name: instance
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Instance ID
+          example: my-instance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendAudioRequest'
+      responses:
+        '200':
+          description: Audio message sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SendAudioResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /instance/{instance}/message/document:
+    post:
+      tags:
+        - Messages
+      summary: Send document
+      description: Send a document (PDF, DOC, etc.) to a phone number
+      parameters:
+        - name: instance
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Instance ID
+          example: my-instance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendDocumentRequest'
+      responses:
+        '200':
+          description: Document sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SendDocumentResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /instance/{instance}/message/image:
+    post:
+      tags:
+        - Messages
+      summary: Send image
+      description: Send an image to a phone number
+      parameters:
+        - name: instance
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Instance ID
+          example: my-instance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendDocumentRequest'
+      responses:
+        '200':
+          description: Image sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SendDocumentResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /message/sendReaction/{instance}:
+    post:
+      tags:
+        - Messages
+      summary: Send reaction
+      description: Send a reaction (emoji) to a message
+      parameters:
+        - name: instance
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Instance ID
+          example: my-instance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendReactionRequest'
+      responses:
+        '200':
+          description: Reaction sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SendReactionResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /webhook/heartbeat:
+    get:
+      tags:
+        - Webhooks
+      summary: Get heartbeat webhook URL
+      description: Get the current heartbeat webhook URL configuration
+      responses:
+        '200':
+          description: Current heartbeat webhook URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetHeartbeatWebhookResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      tags:
+        - Webhooks
+      summary: Update heartbeat webhook URL
+      description: Configure the webhook URL for system metrics (heartbeat). This webhook receives system metrics every minute.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateHeartbeatWebhookRequest'
+      responses:
+        '200':
+          description: Heartbeat webhook URL updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateHeartbeatWebhookResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+

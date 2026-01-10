@@ -11,7 +11,6 @@ import (
 	"github.com/verbeux-ai/whatsmiau/interfaces"
 	"github.com/verbeux-ai/whatsmiau/lib/storage/gcs"
 	"github.com/verbeux-ai/whatsmiau/models"
-	"github.com/verbeux-ai/whatsmiau/repositories/instances"
 	"github.com/verbeux-ai/whatsmiau/services"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/store/sqlstore"
@@ -39,6 +38,19 @@ type Whatsmiau struct {
 var instance *Whatsmiau
 var mu = &sync.Mutex{}
 
+// NoOpLogger es un logger que no hace nada (no muestra ningún log)
+type NoOpLogger struct{}
+
+func (n *NoOpLogger) Debug(msg string)                {}
+func (n *NoOpLogger) Info(msg string)                 {}
+func (n *NoOpLogger) Warn(msg string)                 {}
+func (n *NoOpLogger) Error(msg string)                 {}
+func (n *NoOpLogger) Debugf(template string, args ...interface{}) {}
+func (n *NoOpLogger) Infof(template string, args ...interface{})  {}
+func (n *NoOpLogger) Warnf(template string, args ...interface{})  {}
+func (n *NoOpLogger) Errorf(template string, args ...interface{})  {}
+func (n *NoOpLogger) Sub(module string) waLog.Logger { return n }
+
 func Get() *Whatsmiau {
 	mu.Lock()
 	defer mu.Unlock()
@@ -58,7 +70,7 @@ func LoadMiau(ctx context.Context, container *sqlstore.Container) {
 		level = "DEBUG"
 	}
 
-	repo := instances.NewRedis(services.Redis())
+	repo := services.GetInstanceRepository()
 	instanceList, err := repo.List(ctx, "")
 	if err != nil {
 		zap.L().Fatal("failed to list instances", zap.Error(err))
@@ -75,7 +87,14 @@ func LoadMiau(ctx context.Context, container *sqlstore.Container) {
 
 	clients := xsync.NewMap[string, *whatsmeow.Client]()
 
-	clientLog := waLog.Stdout("Client", level, false)
+	// Si no estamos en modo debug, usar un logger completamente silencioso (NoOp)
+	var clientLog waLog.Logger
+	if env.Env.DebugMode || env.Env.DebugWhatsmeow {
+		clientLog = waLog.Stdout("Client", level, false)
+	} else {
+		// Logger completamente silencioso que no muestra ningún log
+		clientLog = &NoOpLogger{}
+	}
 	for _, device := range deviceStore {
 		client := whatsmeow.NewClient(device, clientLog)
 		if client.Store.ID == nil {
@@ -131,7 +150,9 @@ func LoadMiau(ctx context.Context, container *sqlstore.Container) {
 	go instance.startEmitter()
 
 	clients.Range(func(id string, client *whatsmeow.Client) bool {
-		zap.L().Info("stating event handler", zap.String("jid", client.Store.ID.String()))
+		if env.Env.DebugMode {
+			zap.L().Info("stating event handler", zap.String("jid", client.Store.ID.String()))
+		}
 		client.AddEventHandler(instance.Handle(id))
 		return true
 	})
@@ -286,7 +307,9 @@ func (s *Whatsmiau) observeConnection(client *whatsmeow.Client, id string) {
 					continue
 				}
 
-				zap.L().Info("device connected successfully", zap.String("id", id))
+				if env.Env.DebugMode {
+					zap.L().Info("device connected successfully", zap.String("id", id))
+				}
 				client.RemoveEventHandlers()
 				client.AddEventHandler(s.Handle(id))
 				if _, err := s.repo.Update(context.Background(), id, &models.Instance{

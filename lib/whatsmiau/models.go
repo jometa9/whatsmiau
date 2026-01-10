@@ -9,9 +9,10 @@ import (
 type Wook string
 
 const (
-	WookMessagesUpsert Wook = "messages.upsert"
-	WookMessagesUpdate Wook = "messages.update"
-	WookContactsUpsert Wook = "contacts.upsert"
+	WookMessagesUpsert    Wook = "messages.upsert"
+	WookMessagesUpdate    Wook = "messages.update"
+	WookContactsUpsert    Wook = "contacts.upsert"
+	WookSessionDisconnect Wook = "session.disconnected"
 )
 
 type WookEvent[data any] struct {

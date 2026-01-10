@@ -90,7 +90,7 @@ func (s *Instance) Update(ctx echo.Context) error {
 		ID: request.ID,
 		Webhook: models.InstanceWebhook{
 			Url:    request.Webhook.URL,
-			Base64: &[]bool{request.Webhook.Base64}[0],
+			Base64: request.Webhook.Base64,
 			Events: request.Webhook.Events,
 		},
 	})

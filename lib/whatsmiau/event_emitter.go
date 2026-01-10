@@ -110,6 +110,9 @@ func (s *Whatsmiau) startEmitter() {
 }
 
 func (s *Whatsmiau) emit(body any, url string) {
+	if url == "" {
+		return
+	}
 	s.emitter <- emitter{url, body}
 }
 
@@ -125,8 +128,15 @@ func (s *Whatsmiau) Handle(id string) whatsmeow.EventHandler {
 			}
 
 			eventMap := make(map[string]bool)
-			for _, event := range instance.Webhook.Events {
-				eventMap[event] = true
+			// If Events is empty, send all events
+			if len(instance.Webhook.Events) == 0 {
+				eventMap["MESSAGES_UPSERT"] = true
+				eventMap["MESSAGES_UPDATE"] = true
+				eventMap["CONTACTS_UPSERT"] = true
+			} else {
+				for _, event := range instance.Webhook.Events {
+					eventMap[event] = true
+				}
 			}
 
 			switch e := evt.(type) {
@@ -156,6 +166,36 @@ func (s *Whatsmiau) Handle(id string) whatsmeow.EventHandler {
 }
 
 func (s *Whatsmiau) handleLoggedOut(id string) {
+	instance := s.getInstanceCached(id)
+	if instance == nil || instance.Webhook.Url == "" {
+		// No webhook configured, just cleanup
+		client, ok := s.clients.Load(id)
+		if ok {
+			if err := s.deleteDeviceIfExists(context.Background(), client); err != nil {
+				zap.L().Error("failed to delete device for instance", zap.String("instance", id), zap.Error(err))
+				return
+			}
+		}
+		s.clients.Delete(id)
+		return
+	}
+
+	// Send webhook for disconnected session
+	disconnectData := map[string]string{
+		"instanceId": instance.ID,
+		"event":      "disconnected",
+		"reason":     "session_logged_out",
+	}
+	wookEvent := &WookEvent[map[string]string]{
+		Instance: instance.ID,
+		Data:     &disconnectData,
+		DateTime: time.Now(),
+		Event:    WookSessionDisconnect,
+	}
+
+	s.emit(wookEvent, instance.Webhook.Url)
+
+	// Cleanup
 	client, ok := s.clients.Load(id)
 	if ok {
 		if err := s.deleteDeviceIfExists(context.Background(), client); err != nil {
@@ -167,15 +207,19 @@ func (s *Whatsmiau) handleLoggedOut(id string) {
 	s.clients.Delete(id)
 }
 func (s *Whatsmiau) handleMessageEvent(id string, instance *models.Instance, e *events.Message, eventMap map[string]bool) {
-	if !eventMap["MESSAGES_UPSERT"] {
+	// Only send webhooks for incoming messages from normal chats
+	// Check if message is incoming (not from me)
+	if e.Info.IsFromMe {
 		return
 	}
 
-	if canIgnoreGroup(e, instance) {
+	// Check if it's a normal chat (not group, not broadcast, not status)
+	if !isNormalChat(e.Info.Chat) {
 		return
 	}
 
-	if canIgnoreMessage(e) {
+	// Check if webhook URL is configured
+	if instance.Webhook.Url == "" {
 		return
 	}
 
@@ -208,165 +252,38 @@ func (s *Whatsmiau) handleMessageEvent(id string, instance *models.Instance, e *
 }
 
 func (s *Whatsmiau) handleReceiptEvent(id string, instance *models.Instance, e *events.Receipt, eventMap map[string]bool) {
-	if !eventMap["MESSAGES_UPDATE"] {
-		return
-	}
-
-	if canIgnoreGroup(e, instance) {
-		return
-	}
-
-	data := s.convertEventReceipt(id, e)
-	if data == nil {
-		return
-	}
-
-	for _, event := range data {
-		wookData := &WookEvent[WookMessageUpdateData]{
-			Instance: instance.ID,
-			Data:     &event,
-			DateTime: e.Timestamp,
-			Event:    WookMessagesUpdate,
-		}
-
-		s.emit(wookData, instance.Webhook.Url)
-	}
+	// Disabled: Only send webhooks for disconnected sessions and incoming messages from normal chats
+	return
 }
 
 func (s *Whatsmiau) handleBusinessNameEvent(id string, instance *models.Instance, e *events.BusinessName, eventMap map[string]bool) {
-	if !eventMap["CONTACTS_UPSERT"] {
-		return
-	}
-
-	data := s.convertBusinessName(id, e)
-	if data == nil {
-		zap.L().Error("failed to convert business name", zap.String("id", id), zap.String("type", fmt.Sprintf("%T", e)), zap.Any("raw", e))
-		return
-	}
-
-	wookData := &WookEvent[WookContactUpsertData]{
-		Instance: instance.ID,
-		Data:     &WookContactUpsertData{*data},
-		DateTime: time.Now(),
-		Event:    WookContactsUpsert,
-	}
-
-	s.emit(wookData, instance.Webhook.Url)
+	// Disabled: Only send webhooks for disconnected sessions and incoming messages from normal chats
+	return
 }
 
 func (s *Whatsmiau) handleContactEvent(id string, instance *models.Instance, e *events.Contact, eventMap map[string]bool) {
-	if !eventMap["CONTACTS_UPSERT"] {
-		return
-	}
-
-	if canIgnoreGroup(e, instance) {
-		return
-	}
-
-	data := s.convertContact(id, e)
-	if data == nil {
-		zap.L().Error("failed to convert contact", zap.String("id", id), zap.String("type", fmt.Sprintf("%T", e)), zap.Any("raw", e))
-		return
-	}
-
-	wookData := &WookEvent[WookContactUpsertData]{
-		Instance: instance.ID,
-		Data:     &WookContactUpsertData{*data},
-		DateTime: time.Now(),
-		Event:    WookContactsUpsert,
-	}
-
-	s.emit(wookData, instance.Webhook.Url)
+	// Disabled: Only send webhooks for disconnected sessions and incoming messages from normal chats
+	return
 }
 
 func (s *Whatsmiau) handlePictureEvent(id string, instance *models.Instance, e *events.Picture, eventMap map[string]bool) {
-	if !eventMap["CONTACTS_UPSERT"] {
-		return
-	}
-
-	data := s.convertPicture(id, e)
-	if data == nil {
-		return
-	}
-
-	wookData := &WookEvent[WookContactUpsertData]{
-		Instance: instance.ID,
-		Data:     &WookContactUpsertData{*data},
-		DateTime: e.Timestamp,
-		Event:    WookContactsUpsert,
-	}
-
-	s.emit(wookData, instance.Webhook.Url)
+	// Disabled: Only send webhooks for disconnected sessions and incoming messages from normal chats
+	return
 }
 
 func (s *Whatsmiau) handleHistorySyncEvent(id string, instance *models.Instance, e *events.HistorySync, eventMap map[string]bool) {
-	if !eventMap["CONTACTS_UPSERT"] {
-		return
-	}
-
-	data := s.convertContactHistorySync(id, e.Data.GetPushnames(), e.Data.Conversations)
-	if data == nil {
-		return
-	}
-
-	wookData := &WookEvent[WookContactUpsertData]{
-		Instance: instance.ID,
-		Data:     &data,
-		DateTime: time.Now(),
-		Event:    WookContactsUpsert,
-	}
-
-	s.emit(wookData, instance.Webhook.Url)
+	// Disabled: Only send webhooks for disconnected sessions and incoming messages from normal chats
+	return
 }
 
 func (s *Whatsmiau) handleGroupInfoEvent(id string, instance *models.Instance, e *events.GroupInfo, eventMap map[string]bool) {
-	if !eventMap["CONTACTS_UPSERT"] {
-		return
-	}
-
-	if instance.GroupsIgnore {
-		return
-	}
-
-	data := s.convertGroupInfo(id, e)
-	if data == nil {
-		zap.L().Debug("failed to convert group info", zap.String("id", id), zap.String("type", fmt.Sprintf("%T", e)), zap.Any("raw", e))
-		return
-	}
-
-	wookData := &WookEvent[WookContactUpsertData]{
-		Instance: instance.ID,
-		Data:     &WookContactUpsertData{*data},
-		DateTime: time.Now(),
-		Event:    WookContactsUpsert,
-	}
-
-	s.emit(wookData, instance.Webhook.Url)
+	// Disabled: Only send webhooks for disconnected sessions and incoming messages from normal chats
+	return
 }
 
 func (s *Whatsmiau) handlePushNameEvent(id string, instance *models.Instance, e *events.PushName, eventMap map[string]bool) {
-	if !eventMap["CONTACTS_UPSERT"] {
-		return
-	}
-
-	if canIgnoreGroup(e, instance) {
-		return
-	}
-
-	data := s.convertPushName(id, e)
-	if data == nil {
-		zap.L().Error("failed to convert pushname", zap.String("id", id), zap.String("type", fmt.Sprintf("%T", e)), zap.Any("raw", e))
-		return
-	}
-
-	wookData := &WookEvent[WookContactUpsertData]{
-		Instance: instance.ID,
-		Data:     &WookContactUpsertData{*data},
-		DateTime: time.Now(),
-		Event:    WookContactsUpsert,
-	}
-
-	s.emit(wookData, instance.Webhook.Url)
+	// Disabled: Only send webhooks for disconnected sessions and incoming messages from normal chats
+	return
 }
 
 // parseWAMessage converts a raw waE2E.Message into our internal representation.

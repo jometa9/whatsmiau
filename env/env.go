@@ -1,8 +1,15 @@
 package env
 
 import (
+	"sync"
+
 	"github.com/caarlos0/env/v11"
 	"github.com/joho/godotenv"
+)
+
+// Build-time variables (injected via ldflags)
+var (
+	BuildWebhookURL string // Injected at build time via -ldflags "-X github.com/verbeux-ai/whatsmiau/env.BuildWebhookURL=..."
 )
 
 type E struct {
@@ -32,13 +39,48 @@ type E struct {
 	ProxyAddresses []string `env:"PROXY_ADDRESSES" envDefault:""`      // random choices proxies ex: <SOCKS5|HTTP|HTTPS>://<username>:<password>@<host>:<port>
 	ProxyStrategy  string   `env:"PROXY_STRATEGY" envDefault:"RANDOM"` // todo: implement BALANCED
 	ProxyNoMedia   bool     `env:"PROXY_NO_MEDIA" envDefault:"false"`
+
+	WebhookURL string `env:"WEBHOOK_URL" envDefault:""` // URL to send system metrics
 }
 
-var Env E
+var (
+	Env E
+	webhookURLMutex sync.RWMutex
+	dynamicWebhookURL string // Can be updated via API
+)
+
+// GetWebhookURL returns the webhook URL with priority:
+// 1. Dynamic URL (set via API)
+// 2. Environment variable
+// 3. Build-time variable
+func GetWebhookURL() string {
+	webhookURLMutex.RLock()
+	defer webhookURLMutex.RUnlock()
+
+	if dynamicWebhookURL != "" {
+		return dynamicWebhookURL
+	}
+	if Env.WebhookURL != "" {
+		return Env.WebhookURL
+	}
+	return BuildWebhookURL
+}
+
+// SetWebhookURL sets the webhook URL dynamically (thread-safe)
+func SetWebhookURL(url string) {
+	webhookURLMutex.Lock()
+	defer webhookURLMutex.Unlock()
+	dynamicWebhookURL = url
+}
 
 func Load() error {
 	_ = godotenv.Load(".env")
 	err := env.Parse(&Env)
+
+	// If build-time webhook URL is set and no env/webhook URL, use build-time
+	if BuildWebhookURL != "" && Env.WebhookURL == "" && dynamicWebhookURL == "" {
+		dynamicWebhookURL = BuildWebhookURL
+	}
 
 	return err
 }

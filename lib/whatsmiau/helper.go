@@ -20,6 +20,7 @@ import (
 	"github.com/verbeux-ai/whatsmiau/env"
 	"github.com/verbeux-ai/whatsmiau/models"
 	"go.mau.fi/whatsmeow"
+	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
 	"go.uber.org/zap"
 	"golang.org/x/net/context"
@@ -253,6 +254,28 @@ func extractExtFromFile(fileName, mimeType string, file *os.File) string {
 
 func canIgnoreMessage(msg *events.Message) bool {
 	return strings.Contains(msg.Info.Chat.String(), "status")
+}
+
+// isNormalChat returns true if the JID represents a normal chat (not group, not broadcast, not status)
+func isNormalChat(jid types.JID) bool {
+	jidStr := jid.String()
+	// Groups end with @g.us
+	if strings.HasSuffix(jidStr, "@g.us") {
+		return false
+	}
+	// Status chats contain "status"
+	if strings.Contains(jidStr, "status") {
+		return false
+	}
+	// Broadcast channels end with @broadcast
+	if strings.HasSuffix(jidStr, "@broadcast") {
+		return false
+	}
+	// Newsletter channels end with @newsletter
+	if strings.HasSuffix(jidStr, "@newsletter") {
+		return false
+	}
+	return true
 }
 
 // canIgnoreGroup returns true if group can be ignored

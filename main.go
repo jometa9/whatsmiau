@@ -29,7 +29,32 @@ func main() {
 	defer c()
 	whatsmiau.LoadMiau(ctx, services.SQLStore())
 
+	// Set instance repository for monitoring (use the same repository as routes)
+	repo := services.GetInstanceRepository()
+	services.SetInstanceRepository(repo)
+
+	// Set connected instance checker to avoid import cycle
+	// This function checks if an instance is connected using whatsmiau
+	services.SetConnectedInstanceChecker(func(instanceID string) bool {
+		whatsmiauInstance := whatsmiau.Get()
+		if whatsmiauInstance == nil {
+			return false
+		}
+		status, err := whatsmiauInstance.Status(instanceID)
+		return err == nil && status == whatsmiau.Connected
+	})
+
+	// Start system monitoring service
+	services.StartMonitor()
+
 	app := echo.New()
+	
+	// Si NO estamos en modo debug, deshabilitar el banner y el logger de Echo
+	if !env.Env.DebugMode {
+		app.HideBanner = true
+		app.Logger.SetLevel(0) // Deshabilitar todos los logs de Echo
+	}
+	
 	app.Pre(middleware.Recover())
 	app.Pre(middleware.RemoveTrailingSlash())
 	app.Pre(middleware.CORS())
@@ -37,7 +62,10 @@ func main() {
 	routes.Load(app)
 
 	port := ":" + env.Env.Port
-	zap.L().Info("starting server...", zap.String("port", port))
+	
+	if env.Env.DebugMode {
+		zap.L().Info("starting server...", zap.String("port", port))
+	}
 
 	s := &http2.Server{}
 	if err := app.StartH2CServer(port, s); err != nil {
