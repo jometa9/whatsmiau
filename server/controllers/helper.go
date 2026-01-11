@@ -2,7 +2,9 @@ package controllers
 
 import (
 	"fmt"
+	"mime"
 	"net/url"
+	"path/filepath"
 	"strings"
 
 	"github.com/verbeux-ai/whatsmiau/models"
@@ -63,4 +65,39 @@ func splitHostPort(h string) (string, string, error) {
 		return "", "", fmt.Errorf("expected host:port, got %s", h)
 	}
 	return parts[0], parts[1], nil
+}
+
+// detectMimetypeFromURL detecta el mimetype basándose en la extensión de la URL
+// Retorna el mimetype y un error si la extensión no es válida o no está soportada
+func detectMimetypeFromURL(urlStr string) (string, error) {
+	// Extraer la extensión de la URL
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return "", fmt.Errorf("invalid URL: %w", err)
+	}
+
+	ext := strings.ToLower(filepath.Ext(u.Path))
+	if ext == "" {
+		return "", fmt.Errorf("no file extension found in URL")
+	}
+
+	// Detectar mimetype basándose en la extensión
+	mimetype := mime.TypeByExtension(ext)
+	if mimetype == "" {
+		return "", fmt.Errorf("unsupported file extension: %s", ext)
+	}
+
+	return mimetype, nil
+}
+
+// isImageExtension verifica si la extensión corresponde a una imagen
+func isImageExtension(ext string) bool {
+	imageExts := map[string]bool{
+		".jpg":  true,
+		".jpeg": true,
+		".png":  true,
+		".gif":  true,
+		".webp": true,
+	}
+	return imageExts[strings.ToLower(ext)]
 }

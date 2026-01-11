@@ -127,96 +127,114 @@ func (s *Instance) Connect(ctx echo.Context) error {
 	c := ctx.Request().Context()
 	var request dto.ConnectInstanceRequest
 	if err := ctx.Bind(&request); err != nil {
-		return utils.HTTPFail(ctx, http.StatusUnprocessableEntity, err, "failed to bind request body")
+		return ctx.JSON(http.StatusOK, dto.ConnectInstanceResponse{
+			Success:   false,
+			Connected: false,
+		})
 	}
 
 	result, err := s.repo.List(c, request.ID)
 	if err != nil {
 		zap.L().Error("failed to list instances", zap.Error(err))
-		return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to list instances")
+		return ctx.JSON(http.StatusOK, dto.ConnectInstanceResponse{
+			Success:   false,
+			Connected: false,
+		})
 	}
 
 	if len(result) == 0 {
-		return utils.HTTPFail(ctx, http.StatusNotFound, err, "instance not found")
+		return ctx.JSON(http.StatusOK, dto.ConnectInstanceResponse{
+			Success:   false,
+			Connected: false,
+		})
+	}
+
+	instance := result[0]
+	response := dto.ConnectInstanceResponse{
+		Success:   true,
+		Connected: false,
+	}
+
+	// Obtener RemoteJID si existe
+	if instance.RemoteJID != "" {
+		response.RemoteJID = &instance.RemoteJID
 	}
 
 	// Verificar el estado actual de la instancia
 	status, err := s.whatsmiau.Status(request.ID)
 	if err != nil {
 		zap.L().Error("failed to get status instance", zap.Error(err))
-		return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to get status instance")
+		return ctx.JSON(http.StatusOK, dto.ConnectInstanceResponse{
+			Success:   false,
+			Connected: false,
+		})
 	}
 
-	// Si ya está conectada, retornar que ya está conectada
+	// Si ya está conectada
 	if status == whatsmiau.Connected {
-		return ctx.JSON(http.StatusOK, dto.ConnectInstanceResponse{
-			Message:   "instance already connected",
-			Connected: true,
-		})
+		response.Connected = true
+		return ctx.JSON(http.StatusOK, response)
 	}
 
 	// Verificar si hay un QR code en cache
-	if qrCode, ok := s.whatsmiau.GetQRCode(request.ID); ok && qrCode != "" {
+	var qrCode string
+	var hasQR bool
+	if cachedQR, ok := s.whatsmiau.GetQRCode(request.ID); ok && cachedQR != "" {
+		qrCode = cachedQR
+		hasQR = true
+	} else {
+		// Si el observer está corriendo pero aún no hay QR, intentar conectar
+		if s.whatsmiau.IsObserverRunning(request.ID) {
+			qrCode, err = s.whatsmiau.Connect(c, request.ID)
+			if err != nil {
+				zap.L().Error("failed to connect instance", zap.Error(err))
+				return ctx.JSON(http.StatusOK, dto.ConnectInstanceResponse{
+					Success:   false,
+					Connected: false,
+				})
+			}
+			if qrCode != "" {
+				hasQR = true
+			}
+		} else {
+			// Iniciar la conexión y obtener el QR
+			qrCode, err = s.whatsmiau.Connect(c, request.ID)
+			if err != nil {
+				zap.L().Error("failed to connect instance", zap.Error(err))
+				return ctx.JSON(http.StatusOK, dto.ConnectInstanceResponse{
+					Success:   false,
+					Connected: false,
+				})
+			}
+			if qrCode != "" {
+				hasQR = true
+			}
+		}
+	}
+
+	// Si hay QR code, codificarlo en base64
+	if hasQR && qrCode != "" {
 		png, err := qrcode.Encode(qrCode, qrcode.Medium, 512)
 		if err != nil {
 			zap.L().Error("failed to encode qrcode", zap.Error(err))
-			return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to encode qrcode")
-		}
-		return ctx.JSON(http.StatusOK, dto.ConnectInstanceResponse{
-			Message:   "QR code available",
-			Connected: false,
-			Base64:    "data:image/png;base64," + base64.StdEncoding.EncodeToString(png),
-		})
-	}
-
-	// Si el observer está corriendo pero aún no hay QR, intentar conectar y esperar un poco
-	if s.whatsmiau.IsObserverRunning(request.ID) {
-		// El observer ya está corriendo, intentar obtener el QR
-		qrCode, err := s.whatsmiau.Connect(c, request.ID)
-		if err != nil {
-			zap.L().Error("failed to connect instance", zap.Error(err))
-			return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to connect instance")
-		}
-		if qrCode != "" {
-			png, err := qrcode.Encode(qrCode, qrcode.Medium, 512)
-			if err != nil {
-				zap.L().Error("failed to encode qrcode", zap.Error(err))
-				return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to encode qrcode")
-			}
 			return ctx.JSON(http.StatusOK, dto.ConnectInstanceResponse{
-				Message:   "QR code available",
+				Success:   false,
 				Connected: false,
-				Base64:    "data:image/png;base64," + base64.StdEncoding.EncodeToString(png),
 			})
 		}
+		qrBase64 := base64.StdEncoding.EncodeToString(png)
+		response.QR = &qrBase64
 	}
 
-	// Iniciar la conexión y obtener el QR
-	qrCode, err := s.whatsmiau.Connect(c, request.ID)
-	if err != nil {
-		zap.L().Error("failed to connect instance", zap.Error(err))
-		return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to connect instance")
-	}
-
-	// Si hay QR code, retornarlo en base64
-	if qrCode != "" {
-		png, err := qrcode.Encode(qrCode, qrcode.Medium, 512)
-		if err != nil {
-			zap.L().Error("failed to encode qrcode", zap.Error(err))
-			return utils.HTTPFail(ctx, http.StatusInternalServerError, err, "failed to encode qrcode")
+	// Si no hay QR code, verificar si ya está conectada
+	if !hasQR {
+		status, err := s.whatsmiau.Status(request.ID)
+		if err == nil && status == whatsmiau.Connected {
+			response.Connected = true
 		}
-		return ctx.JSON(http.StatusOK, dto.ConnectInstanceResponse{
-			Message:   "QR code available",
-			Connected: false,
-			Base64:    "data:image/png;base64," + base64.StdEncoding.EncodeToString(png),
-		})
 	}
 
-	// Si no hay QR code, significa que ya está conectada (el método Connect retorna "" cuando ya está conectada)
-	return ctx.JSON(http.StatusOK, dto.ConnectInstanceResponse{
-		Message:   "instance already connected",
-		Connected: true,
-	})
+	return ctx.JSON(http.StatusOK, response)
 }
 
 func (s *Instance) ConnectQRBuffer(ctx echo.Context) error {

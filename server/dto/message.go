@@ -1,14 +1,9 @@
 package dto
 
 type SendTextRequest struct {
-	InstanceID       string                `param:"instance" validate:"required"`
-	Number           string                `json:"number,omitempty" validate:"required"` // JID
-	Text             string                `json:"text,omitempty" validate:"required"`
-	Delay            int                   `json:"delay,omitempty" validate:"omitempty,min=0,max=300000"`
-	Quoted           *MessageRequestQuoted `json:"quoted,omitempty"`
-	LinkPreview      bool                  `json:"linkPreview,omitempty"`
-	MentionsEveryOne bool                  `json:"mentionsEveryOne,omitempty"`
-	Mentioned        []string              `json:"mentioned,omitempty"`
+	InstanceID string `param:"instance" validate:"required"`
+	Number     string `json:"number" validate:"required"` // JID
+	Text       string `json:"text" validate:"required"`
 }
 
 type MessageRequestQuoted struct {
@@ -51,14 +46,9 @@ type ContextInfoQuotedMessage struct {
 }
 
 type SendAudioRequest struct {
-	InstanceID       string                `param:"instance"`
-	Number           string                `json:"number,omitempty"`
-	Audio            string                `json:"audio,omitempty"`
-	Delay            int                   `json:"delay,omitempty" validate:"omitempty,min=0,max=300000"`
-	Quoted           *MessageRequestQuoted `json:"quoted,omitempty"`
-	MentionsEveryOne bool                  `json:"mentionsEveryOne,omitempty"`
-	Mentioned        []string              `json:"mentioned,omitempty"`
-	Encoding         bool                  `json:"encoding,omitempty"`
+	InstanceID string `param:"instance" validate:"required"`
+	Number     string `json:"number" validate:"required"`
+	Audio      string `json:"audio" validate:"required"`
 }
 
 type SendAudioResponseMessage struct {
@@ -115,17 +105,10 @@ type SendMediaResponse struct {
 }
 
 type SendDocumentRequest struct {
-	InstanceID string `param:"instance"`
-	Number     string `json:"number,omitempty"`
-	Mimetype   string `json:"mimetype,omitempty"`
+	InstanceID string `param:"instance" validate:"required"`
+	Number     string `json:"number" validate:"required"`
 	Caption    string `json:"caption,omitempty"`
-	// Media is the URL of the file
-	Media            string                `json:"media,omitempty"`
-	FileName         string                `json:"fileName,omitempty"`
-	Delay            int                   `json:"delay,omitempty" validate:"omitempty,min=0,max=300000"`
-	Quoted           *MessageRequestQuoted `json:"quoted,omitempty"`
-	MentionsEveryOne bool                  `json:"mentionsEveryOne,omitempty"`
-	Mentioned        []string              `json:"mentioned,omitempty"`
+	Media      string `json:"media" validate:"required"` // URL del archivo
 }
 
 type SendDocumentResponse struct {

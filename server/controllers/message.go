@@ -2,14 +2,14 @@ package controllers
 
 import (
 	"net/http"
-	"time"
+	"path/filepath"
+	"strings"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
 	"github.com/verbeux-ai/whatsmiau/interfaces"
 	"github.com/verbeux-ai/whatsmiau/lib/whatsmiau"
 	"github.com/verbeux-ai/whatsmiau/server/dto"
-	"go.mau.fi/whatsmeow/types"
 	"go.uber.org/zap"
 )
 
@@ -59,22 +59,7 @@ func (s *Message) SendText(ctx echo.Context) error {
 		RemoteJID:  jid,
 	}
 
-	if request.Quoted != nil && len(request.Quoted.Key.Id) > 0 && len(request.Quoted.Message.Conversation) > 0 {
-		sendText.QuoteMessage = request.Quoted.Message.Conversation
-		sendText.QuoteMessageID = request.Quoted.Key.Id
-	}
-
 	c := ctx.Request().Context()
-	if err := s.whatsmiau.ChatPresence(&whatsmiau.ChatPresenceRequest{
-		InstanceID: request.InstanceID,
-		RemoteJID:  jid,
-		Presence:   types.ChatPresenceComposing,
-	}); err != nil {
-		zap.L().Error("Whatsmiau.ChatPresence", zap.Error(err))
-	} else {
-		time.Sleep(time.Millisecond * time.Duration(request.Delay)) // TODO: create a more robust solution
-	}
-
 	_, err = s.whatsmiau.SendText(c, sendText)
 	if err != nil {
 		zap.L().Error("Whatsmiau.SendText failed", zap.Error(err))
@@ -118,30 +103,14 @@ func (s *Message) SendAudio(ctx echo.Context) error {
 		})
 	}
 
-	sendText := &whatsmiau.SendAudioRequest{
+	sendAudio := &whatsmiau.SendAudioRequest{
 		AudioURL:   request.Audio,
 		InstanceID: request.InstanceID,
 		RemoteJID:  jid,
 	}
 
-	if request.Quoted != nil && len(request.Quoted.Key.Id) > 0 && len(request.Quoted.Message.Conversation) > 0 {
-		sendText.QuoteMessage = request.Quoted.Message.Conversation
-		sendText.QuoteMessageID = request.Quoted.Key.Id
-	}
-
 	c := ctx.Request().Context()
-	if err := s.whatsmiau.ChatPresence(&whatsmiau.ChatPresenceRequest{
-		InstanceID: request.InstanceID,
-		RemoteJID:  jid,
-		Presence:   types.ChatPresenceComposing,
-		Media:      types.ChatPresenceMediaAudio,
-	}); err != nil {
-		zap.L().Error("Whatsmiau.ChatPresence", zap.Error(err))
-	} else {
-		time.Sleep(time.Millisecond * time.Duration(request.Delay)) // TODO: create a more robust solution
-	}
-
-	_, err = s.whatsmiau.SendAudio(c, sendText)
+	_, err = s.whatsmiau.SendAudio(c, sendAudio)
 	if err != nil {
 		zap.L().Error("Whatsmiau.SendAudioRequest failed", zap.Error(err))
 		return ctx.JSON(http.StatusInternalServerError, dto.SendAudioResponse{
@@ -174,13 +143,23 @@ func (s *Message) SendMedia(ctx echo.Context) error {
 			Message: err.Error(),
 		})
 	}
-	switch request.Mediatype {
-	case "image":
-		request.SendDocumentRequest.Mimetype = "image/png"
-		return s.sendImage(ctx, request.SendDocumentRequest)
+
+	// Detectar mimetype automáticamente desde la URL
+	detectedMimetype, err := detectMimetypeFromURL(request.SendDocumentRequest.Media)
+	if err != nil {
+		return ctx.JSON(http.StatusBadRequest, dto.SendDocumentResponse{
+			Success: false,
+			Error:   "failed to detect mimetype from URL",
+			Message: err.Error(),
+		})
 	}
 
-	return s.sendDocument(ctx, request.SendDocumentRequest)
+	switch request.Mediatype {
+	case "image":
+		return s.sendImage(ctx, request.SendDocumentRequest, detectedMimetype)
+	}
+
+	return s.sendDocument(ctx, request.SendDocumentRequest, detectedMimetype)
 }
 
 func (s *Message) SendDocument(ctx echo.Context) error {
@@ -201,10 +180,26 @@ func (s *Message) SendDocument(ctx echo.Context) error {
 		})
 	}
 
-	return s.sendDocument(ctx, request)
+	// Detectar mimetype automáticamente desde la URL
+	detectedMimetype, err := detectMimetypeFromURL(request.Media)
+	if err != nil {
+		return ctx.JSON(http.StatusBadRequest, dto.SendDocumentResponse{
+			Success: false,
+			Error:   "failed to detect mimetype from URL",
+			Message: err.Error(),
+		})
+	}
+
+	// Extraer extensión de la URL para determinar si es imagen o documento
+	ext := strings.ToLower(filepath.Ext(request.Media))
+	if isImageExtension(ext) {
+		return s.sendImage(ctx, request, detectedMimetype)
+	}
+
+	return s.sendDocument(ctx, request, detectedMimetype)
 }
 
-func (s *Message) sendDocument(ctx echo.Context, request dto.SendDocumentRequest) error {
+func (s *Message) sendDocument(ctx echo.Context, request dto.SendDocumentRequest, mimetype string) error {
 	jid, err := numberToJid(request.Number)
 	if err != nil {
 		zap.L().Error("error converting number to jid", zap.Error(err))
@@ -215,18 +210,22 @@ func (s *Message) sendDocument(ctx echo.Context, request dto.SendDocumentRequest
 		})
 	}
 
+	// Extraer nombre de archivo de la URL
+	fileName := filepath.Base(request.Media)
+	if fileName == "" || fileName == "." {
+		fileName = "document"
+	}
+
 	sendData := &whatsmiau.SendDocumentRequest{
 		InstanceID: request.InstanceID,
 		MediaURL:   request.Media,
 		Caption:    request.Caption,
-		FileName:   request.FileName,
+		FileName:   fileName,
 		RemoteJID:  jid,
-		Mimetype:   request.Mimetype,
+		Mimetype:   mimetype,
 	}
 
 	c := ctx.Request().Context()
-	time.Sleep(time.Millisecond * time.Duration(request.Delay)) // TODO: create a more robust solution
-
 	_, err = s.whatsmiau.SendDocument(c, sendData)
 	if err != nil {
 		zap.L().Error("Whatsmiau.SendDocument failed", zap.Error(err))
@@ -242,28 +241,7 @@ func (s *Message) sendDocument(ctx echo.Context, request dto.SendDocumentRequest
 	})
 }
 
-func (s *Message) SendImage(ctx echo.Context) error {
-	var request dto.SendDocumentRequest
-	if err := ctx.Bind(&request); err != nil {
-		return ctx.JSON(http.StatusBadRequest, dto.SendDocumentResponse{
-			Success: false,
-			Error:   "failed to bind request body",
-			Message: err.Error(),
-		})
-	}
-
-	if err := validator.New().Struct(&request); err != nil {
-		return ctx.JSON(http.StatusBadRequest, dto.SendDocumentResponse{
-			Success: false,
-			Error:   "invalid request body",
-			Message: err.Error(),
-		})
-	}
-
-	return s.sendImage(ctx, request)
-}
-
-func (s *Message) sendImage(ctx echo.Context, request dto.SendDocumentRequest) error {
+func (s *Message) sendImage(ctx echo.Context, request dto.SendDocumentRequest, mimetype string) error {
 	jid, err := numberToJid(request.Number)
 	if err != nil {
 		zap.L().Error("error converting number to jid", zap.Error(err))
@@ -279,18 +257,16 @@ func (s *Message) sendImage(ctx echo.Context, request dto.SendDocumentRequest) e
 		MediaURL:   request.Media,
 		Caption:    request.Caption,
 		RemoteJID:  jid,
-		Mimetype:   request.Mimetype,
+		Mimetype:   mimetype,
 	}
 
 	c := ctx.Request().Context()
-	time.Sleep(time.Millisecond * time.Duration(request.Delay)) // TODO: create a more robust solution
-
 	_, err = s.whatsmiau.SendImage(c, sendData)
 	if err != nil {
-		zap.L().Error("Whatsmiau.SendDocument failed", zap.Error(err))
+		zap.L().Error("Whatsmiau.SendImage failed", zap.Error(err))
 		return ctx.JSON(http.StatusInternalServerError, dto.SendDocumentResponse{
 			Success: false,
-			Error:   "failed to send document",
+			Error:   "failed to send image",
 			Message: err.Error(),
 		})
 	}

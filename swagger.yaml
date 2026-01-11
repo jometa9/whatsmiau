@@ -163,48 +163,28 @@ components:
     
     ConnectInstanceResponse:
       type: object
+      required:
+        - success
+        - connected
       properties:
-        message:
+        success:
+          type: boolean
+          description: Whether the operation was successful
+          example: true
+        qr:
           type: string
-          description: Connection status message
+          nullable: true
+          description: QR code in base64 format (without data URI prefix). Null if no QR code is available.
+          example: "iVBORw0KGgoAAAANSUhEUgAA..."
         connected:
           type: boolean
           description: Whether the instance is connected
-        base64:
-          type: string
-          description: QR code in base64 format (if not connected)
-        id:
-          type: string
-        rejectCall:
-          type: boolean
-        msgCall:
-          type: string
-        groupsIgnore:
-          type: boolean
-        alwaysOnline:
-          type: boolean
-        readMessages:
-          type: boolean
-        readStatus:
-          type: boolean
-        syncFullHistory:
-          type: boolean
-        syncRecentHistory:
-          type: boolean
+          example: false
         remoteJID:
           type: string
-        webhook:
-          $ref: '#/components/schemas/InstanceWebhook'
-        proxyHost:
-          type: string
-        proxyPort:
-          type: string
-        proxyProtocol:
-          type: string
-        proxyUsername:
-          type: string
-        proxyPassword:
-          type: string
+          nullable: true
+          description: Remote JID if connected, null otherwise
+          example: "1234567890@s.whatsapp.net"
     
     SendTextRequest:
       type: object
@@ -219,28 +199,7 @@ components:
         text:
           type: string
           description: Message text
-          example: Hello, this is a test message
-        delay:
-          type: integer
-          description: Delay in milliseconds (0-300000)
-          minimum: 0
-          maximum: 300000
-          default: 0
-        quoted:
-          $ref: '#/components/schemas/MessageRequestQuoted'
-        linkPreview:
-          type: boolean
-          description: Enable link preview
-          default: false
-        mentionsEveryOne:
-          type: boolean
-          description: Mention everyone in group
-          default: false
-        mentioned:
-          type: array
-          items:
-            type: string
-          description: List of JIDs to mention
+          example: "Hello, this is a test message"
     
     MessageRequestQuoted:
       type: object
@@ -322,29 +281,9 @@ components:
           example: "1234567890@s.whatsapp.net"
         audio:
           type: string
-          description: Audio file URL or base64 encoded audio
-          example: https://example.com/audio.mp3
-        delay:
-          type: integer
-          description: Delay in milliseconds (0-300000)
-          minimum: 0
-          maximum: 300000
-          default: 0
-        quoted:
-          $ref: '#/components/schemas/MessageRequestQuoted'
-        mentionsEveryOne:
-          type: boolean
-          description: Mention everyone in group
-          default: false
-        mentioned:
-          type: array
-          items:
-            type: string
-          description: List of JIDs to mention
-        encoding:
-          type: boolean
-          description: Enable audio encoding
-          default: false
+          format: uri
+          description: Audio file URL
+          example: "https://example.com/audio.mp3"
     
     SendAudioResponse:
       type: object
@@ -426,38 +365,15 @@ components:
           type: string
           description: Phone number (JID format)
           example: "1234567890@s.whatsapp.net"
-        mimetype:
-          type: string
-          description: MIME type of the document
-          example: application/pdf
         caption:
           type: string
-          description: Caption for the document
+          description: Caption for the document/image (optional)
+          example: "Check this document"
         media:
           type: string
-          description: URL of the file to send
-          example: https://example.com/document.pdf
-        fileName:
-          type: string
-          description: Name of the file
-          example: document.pdf
-        delay:
-          type: integer
-          description: Delay in milliseconds (0-300000)
-          minimum: 0
-          maximum: 300000
-          default: 0
-        quoted:
-          $ref: '#/components/schemas/MessageRequestQuoted'
-        mentionsEveryOne:
-          type: boolean
-          description: Mention everyone in group
-          default: false
-        mentioned:
-          type: array
-          items:
-            type: string
-          description: List of JIDs to mention
+          format: uri
+          description: URL of the file to send. Supports both images (jpg, jpeg, png, gif, webp) and documents (pdf, doc, etc.). The MIME type is automatically detected from the file extension in the URL.
+          example: "https://example.com/document.pdf"
     
     SendDocumentResponse:
       type: object
@@ -612,7 +528,7 @@ paths:
       tags:
         - Instances
       summary: Connect instance and get QR code
-      description: Connect to a WhatsApp instance. Returns QR code in base64 format if not connected. If already connected, returns connection status. If connection is in progress, returns the current QR code.
+      description: Connect to a WhatsApp instance. Returns a simplified response with success status, QR code (in base64, without data URI prefix) if available, connection status, and remote JID if connected.
       parameters:
         - name: id
           in: path
@@ -628,6 +544,25 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ConnectInstanceResponse'
+              examples:
+                withQR:
+                  value:
+                    success: true
+                    qr: "iVBORw0KGgoAAAANSUhEUgAA..."
+                    connected: false
+                    remoteJID: null
+                connected:
+                  value:
+                    success: true
+                    qr: null
+                    connected: true
+                    remoteJID: "1234567890@s.whatsapp.net"
+                error:
+                  value:
+                    success: false
+                    qr: null
+                    connected: false
+                    remoteJID: null
         '404':
           description: Instance not found
           content:
@@ -767,8 +702,8 @@ paths:
     post:
       tags:
         - Messages
-      summary: Send document
-      description: Send a document (PDF, DOC, etc.) to a phone number
+      summary: Send document or image
+      description: Send a document (PDF, DOC, etc.) or image (JPG, PNG, GIF, WEBP) to a phone number. The file type is automatically detected from the URL extension. Images are sent as images, all other files are sent as documents.
       parameters:
         - name: instance
           in: path
@@ -783,49 +718,20 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/SendDocumentRequest'
+            examples:
+              document:
+                value:
+                  number: "1234567890@s.whatsapp.net"
+                  caption: "Check this document"
+                  media: "https://example.com/document.pdf"
+              image:
+                value:
+                  number: "1234567890@s.whatsapp.net"
+                  caption: "Check this image"
+                  media: "https://example.com/image.jpg"
       responses:
         '200':
-          description: Document sent successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SendDocumentResponse'
-        '400':
-          description: Invalid request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SendDocumentResponse'
-        '500':
-          description: Server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SendDocumentResponse'
-
-  /instance/{instance}/message/image:
-    post:
-      tags:
-        - Messages
-      summary: Send image
-      description: Send an image to a phone number
-      parameters:
-        - name: instance
-          in: path
-          required: true
-          schema:
-            type: string
-          description: Instance ID
-          example: my-instance
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SendDocumentRequest'
-      responses:
-        '200':
-          description: Image sent successfully
+          description: Document/image sent successfully
           content:
             application/json:
               schema:

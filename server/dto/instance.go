@@ -29,10 +29,10 @@ type ConnectInstanceRequest struct {
 }
 
 type ConnectInstanceResponse struct {
-	Message   string `json:"message,omitempty"`
-	Connected bool   `json:"connected,omitempty"`
-	Base64    string `json:"base64,omitempty"`
-	*models.Instance
+	Success    bool    `json:"success"`
+	QR         *string `json:"qr,omitempty"`
+	Connected  bool    `json:"connected"`
+	RemoteJID  *string `json:"remoteJID,omitempty"`
 }
 
 type StatusInstanceRequest struct {

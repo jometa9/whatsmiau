@@ -15,7 +15,6 @@ func Message(group *echo.Group) {
 	group.POST("/text", controller.SendText)
 	group.POST("/audio", controller.SendAudio)
 	group.POST("/document", controller.SendDocument)
-	group.POST("/image", controller.SendImage)
 }
 
 func MessageEVO(group *echo.Group) {
