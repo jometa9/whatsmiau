@@ -163,8 +163,8 @@ Same Pattern: https://www.postman.com/agenciadgcode/evolution-api/overview
 | GET    | /v1/instance/:id/status                 | Get instance status         |
 | POST   | /v1/instance/:instance/message/text     | Send a text message         |
 | POST   | /v1/instance/:instance/message/audio    | Send an audio message       |
-| POST   | /v1/instance/:instance/message/document | Send a document             |
-| POST   | /v1/instance/:instance/message/image    | Send an image message       |
+| POST   | /v1/instance/:instance/message/image    | Send a PNG image            |
+| POST   | /v1/instance/:instance/message/video    | Send a MP4 video            |
 | POST   | /v1/instance/:instance/chat/presence    | Send chat presence          |
 | POST   | /v1/instance/:instance/chat/read-messages| Mark messages as read       |
 | POST   | /v1/instance/:instance/chat/whatsapp-numbers| Check if a number is on WhatsApp |

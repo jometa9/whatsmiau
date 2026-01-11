@@ -253,3 +253,65 @@ func (s *Whatsmiau) SendImage(ctx context.Context, data *SendImageRequest) (*Sen
 		CreatedAt: res.Timestamp,
 	}, nil
 }
+
+type SendVideoRequest struct {
+	InstanceID string     `json:"instance_id"`
+	MediaURL   string     `json:"media_url"`
+	Caption    string     `json:"caption"`
+	RemoteJID  *types.JID `json:"remote_jid"`
+	Mimetype   string     `json:"mimetype"`
+}
+
+type SendVideoResponse struct {
+	ID        string    `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func (s *Whatsmiau) SendVideo(ctx context.Context, data *SendVideoRequest) (*SendVideoResponse, error) {
+	client, ok := s.clients.Load(data.InstanceID)
+	if !ok {
+		return nil, whatsmeow.ErrClientIsNil
+	}
+
+	resMedia, err := s.getCtx(ctx, data.MediaURL)
+	if err != nil {
+		return nil, err
+	}
+
+	dataBytes, err := io.ReadAll(resMedia.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	uploaded, err := client.Upload(ctx, dataBytes, whatsmeow.MediaVideo)
+	if err != nil {
+		return nil, err
+	}
+
+	if data.Mimetype == "" {
+		data.Mimetype, err = extractMimetype(dataBytes, uploaded.URL)
+	}
+
+	video := waE2E.VideoMessage{
+		URL:           proto.String(uploaded.URL),
+		Mimetype:      proto.String(data.Mimetype),
+		Caption:       proto.String(data.Caption),
+		FileSHA256:    uploaded.FileSHA256,
+		FileLength:    proto.Uint64(uploaded.FileLength),
+		MediaKey:      uploaded.MediaKey,
+		FileEncSHA256: uploaded.FileEncSHA256,
+		DirectPath:    proto.String(uploaded.DirectPath),
+	}
+
+	res, err := client.SendMessage(ctx, *data.RemoteJID, &waE2E.Message{
+		VideoMessage: &video,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &SendVideoResponse{
+		ID:        res.ID,
+		CreatedAt: res.Timestamp,
+	}, nil
+}

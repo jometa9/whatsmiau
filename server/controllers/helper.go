@@ -90,14 +90,3 @@ func detectMimetypeFromURL(urlStr string) (string, error) {
 	return mimetype, nil
 }
 
-// isImageExtension verifica si la extensión corresponde a una imagen
-func isImageExtension(ext string) bool {
-	imageExts := map[string]bool{
-		".jpg":  true,
-		".jpeg": true,
-		".png":  true,
-		".gif":  true,
-		".webp": true,
-	}
-	return imageExts[strings.ToLower(ext)]
-}

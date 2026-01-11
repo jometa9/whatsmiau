@@ -93,6 +93,16 @@ func (s *Message) SendAudio(ctx echo.Context) error {
 		})
 	}
 
+	// Validar que solo sea MP3
+	ext := strings.ToLower(filepath.Ext(request.Audio))
+	if ext != ".mp3" {
+		return ctx.JSON(http.StatusBadRequest, dto.SendAudioResponse{
+			Success: false,
+			Error:   "invalid file format",
+			Message: "only MP3 format is supported",
+		})
+	}
+
 	jid, err := numberToJid(request.Number)
 	if err != nil {
 		zap.L().Error("error converting number to jid", zap.Error(err))
@@ -162,7 +172,7 @@ func (s *Message) SendMedia(ctx echo.Context) error {
 	return s.sendDocument(ctx, request.SendDocumentRequest, detectedMimetype)
 }
 
-func (s *Message) SendDocument(ctx echo.Context) error {
+func (s *Message) SendImage(ctx echo.Context) error {
 	var request dto.SendDocumentRequest
 	if err := ctx.Bind(&request); err != nil {
 		return ctx.JSON(http.StatusBadRequest, dto.SendDocumentResponse{
@@ -180,23 +190,18 @@ func (s *Message) SendDocument(ctx echo.Context) error {
 		})
 	}
 
-	// Detectar mimetype automáticamente desde la URL
-	detectedMimetype, err := detectMimetypeFromURL(request.Media)
-	if err != nil {
+	// Validar que solo sea PNG
+	ext := strings.ToLower(filepath.Ext(request.Media))
+	if ext != ".png" {
 		return ctx.JSON(http.StatusBadRequest, dto.SendDocumentResponse{
 			Success: false,
-			Error:   "failed to detect mimetype from URL",
-			Message: err.Error(),
+			Error:   "invalid file format",
+			Message: "only PNG format is supported",
 		})
 	}
 
-	// Extraer extensión de la URL para determinar si es imagen o documento
-	ext := strings.ToLower(filepath.Ext(request.Media))
-	if isImageExtension(ext) {
-		return s.sendImage(ctx, request, detectedMimetype)
-	}
-
-	return s.sendDocument(ctx, request, detectedMimetype)
+	// Usar mimetype fijo para PNG
+	return s.sendImage(ctx, request, "image/png")
 }
 
 func (s *Message) sendDocument(ctx echo.Context, request dto.SendDocumentRequest, mimetype string) error {
@@ -267,6 +272,68 @@ func (s *Message) sendImage(ctx echo.Context, request dto.SendDocumentRequest, m
 		return ctx.JSON(http.StatusInternalServerError, dto.SendDocumentResponse{
 			Success: false,
 			Error:   "failed to send image",
+			Message: err.Error(),
+		})
+	}
+
+	return ctx.JSON(http.StatusOK, dto.SendDocumentResponse{
+		Success: true,
+	})
+}
+
+func (s *Message) SendVideo(ctx echo.Context) error {
+	var request dto.SendDocumentRequest
+	if err := ctx.Bind(&request); err != nil {
+		return ctx.JSON(http.StatusBadRequest, dto.SendDocumentResponse{
+			Success: false,
+			Error:   "failed to bind request body",
+			Message: err.Error(),
+		})
+	}
+
+	if err := validator.New().Struct(&request); err != nil {
+		return ctx.JSON(http.StatusBadRequest, dto.SendDocumentResponse{
+			Success: false,
+			Error:   "invalid request body",
+			Message: err.Error(),
+		})
+	}
+
+	// Validar que solo sea MP4
+	ext := strings.ToLower(filepath.Ext(request.Media))
+	if ext != ".mp4" {
+		return ctx.JSON(http.StatusBadRequest, dto.SendDocumentResponse{
+			Success: false,
+			Error:   "invalid file format",
+			Message: "only MP4 format is supported",
+		})
+	}
+
+	jid, err := numberToJid(request.Number)
+	if err != nil {
+		zap.L().Error("error converting number to jid", zap.Error(err))
+		return ctx.JSON(http.StatusBadRequest, dto.SendDocumentResponse{
+			Success: false,
+			Error:   "invalid number format",
+			Message: err.Error(),
+		})
+	}
+
+	sendData := &whatsmiau.SendVideoRequest{
+		InstanceID: request.InstanceID,
+		MediaURL:   request.Media,
+		Caption:    request.Caption,
+		RemoteJID:  jid,
+		Mimetype:   "video/mp4",
+	}
+
+	c := ctx.Request().Context()
+	_, err = s.whatsmiau.SendVideo(c, sendData)
+	if err != nil {
+		zap.L().Error("Whatsmiau.SendVideo failed", zap.Error(err))
+		return ctx.JSON(http.StatusInternalServerError, dto.SendDocumentResponse{
+			Success: false,
+			Error:   "failed to send video",
 			Message: err.Error(),
 		})
 	}
