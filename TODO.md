@@ -28,29 +28,3 @@ Alternativa: usar rebase en lugar de merge (mantiene un historial más limpio):
 git rebase upstream/master
 
 
-
-
-# 1. Crear instancia
-curl -X POST http://localhost:8080/v1/instance \
-  -H "Content-Type: application/json" \
-  -d '{"instanceName": "test-instance"}'
-
-# 2. Conectar y obtener QR (base64)
-curl -X POST http://localhost:8080/v1/instance/test-instance/connect \
-  -H "Content-Type: application/json"
-
-# 3. Obtener QR como imagen
-curl -X GET http://localhost:8080/v1/instance/connect/test-instance/image \
-  -o qr-code.png
-
-# 4. Verificar estado
-curl -X GET http://localhost:8080/v1/instance/test-instance/status
-
-
-curl -X PUT 'http://localhost:8080/v1/instance/update/test-instance' \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "webhook": {
-      "url": "https://webhookapp.dev/webhook/15de2279-53ed-4106-9d02-8894bfbba208"
-    }
-  }'
