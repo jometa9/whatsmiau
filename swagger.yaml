@@ -461,11 +461,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /hard-reset:
+  /reset:
     post:
       tags:
         - System
-      summary: Hard reset
+      summary: Reset
       description: Emergency endpoint that deletes all instances and clears all stored data. This will reset the API to its initial state with no data.
       responses:
         '200':

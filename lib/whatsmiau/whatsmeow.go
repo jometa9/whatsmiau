@@ -425,6 +425,38 @@ func (s *Whatsmiau) Disconnect(id string) error {
 	return nil
 }
 
+// ClearAllData clears all in-memory data without making any API calls to WhatsApp/whatsmeow
+// This is used for hard reset operations where we only want to clean local data
+func (s *Whatsmiau) ClearAllData() {
+	// Disconnect all clients locally (without calling WhatsApp API) and remove them
+	s.clients.Range(func(id string, client *whatsmeow.Client) bool {
+		client.Disconnect()
+		s.clients.Delete(id)
+		return true
+	})
+
+	// Clear all other maps
+	s.qrCache.Range(func(id string, _ string) bool {
+		s.qrCache.Delete(id)
+		return true
+	})
+
+	s.observerRunning.Range(func(id string, _ bool) bool {
+		s.observerRunning.Delete(id)
+		return true
+	})
+
+	s.instanceCache.Range(func(id string, _ models.Instance) bool {
+		s.instanceCache.Delete(id)
+		return true
+	})
+
+	s.lockConnection.Range(func(id string, _ *sync.Mutex) bool {
+		s.lockConnection.Delete(id)
+		return true
+	})
+}
+
 func (s *Whatsmiau) GetJidLid(ctx context.Context, id string, jid types.JID) (string, string) {
 	newJid, newLid := s.extractJidLid(ctx, id, jid)
 	if strings.HasSuffix(newJid, "@lid") {

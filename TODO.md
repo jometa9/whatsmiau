@@ -1,7 +1,5 @@
-swagger minimalista con lo esencial
-lista de endpoints aca
-que funcionen todos los endpoints
-qeu pueda hacer el ejecutable y correrlo en cuarquier lado
+envio de eventos webhook
+que pueda hacer el ejecutable y correrlo en cuarquier lado
 
 
 

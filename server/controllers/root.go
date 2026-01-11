@@ -50,6 +50,11 @@ func HardReset(ctx echo.Context) error {
 	repo := services.GetInstanceRepository()
 	whatsmiauInstance := whatsmiau.Get()
 
+	// Clear all in-memory data from whatsmiau (without calling WhatsApp API)
+	if whatsmiauInstance != nil {
+		whatsmiauInstance.ClearAllData()
+	}
+
 	// Get all instances
 	instances, err := repo.List(ctxReq, "")
 	if err != nil {
@@ -61,13 +66,8 @@ func HardReset(ctx echo.Context) error {
 		})
 	}
 
-	// Logout and delete all instances
+	// Delete all instances from repository
 	for _, instance := range instances {
-		if whatsmiauInstance != nil {
-			if err := whatsmiauInstance.Logout(ctxReq, instance.ID); err != nil {
-				zap.L().Warn("failed to logout instance during hard reset", zap.String("instance", instance.ID), zap.Error(err))
-			}
-		}
 		if err := repo.Delete(ctxReq, instance.ID); err != nil {
 			zap.L().Warn("failed to delete instance during hard reset", zap.String("instance", instance.ID), zap.Error(err))
 		}
